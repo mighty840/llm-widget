@@ -78,12 +78,14 @@ async function probeGPU(): Promise<GPUProbe> {
   // Detect via UA (no reliable API alternative) and cap at 0.5b before any tier logic.
   const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
   if (isIOS) {
+    // q4f32 packs the embedding table into a single ~272 MB buffer that exceeds
+    // iOS Safari's 256 MB per-buffer WebGPU cap. q4f16 halves that to ~136 MB.
     return {
       ok: true, gpuName: gpuName || 'Apple GPU', vramMB,
-      tier: 'mid', recommendedModel: 'qwen-0.5b',
+      tier: 'mid', recommendedModel: 'qwen-0.5b-f16',
       tierLabel: 'Apple Silicon',
       tierColor: '#00e5ff',
-      warning: 'iOS WebGPU has a ~256 MB buffer limit. Using the 0.5B model to stay within it — larger models crash the tab.',
+      warning: 'iOS WebGPU has a 256 MB per-buffer cap. Using q4f16 to stay within it.',
     };
   }
 

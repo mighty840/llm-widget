@@ -6,6 +6,7 @@ const MODELS: Record<string, string> = {
   'qwen-1.5b':     'Qwen2.5-1.5B-Instruct-q4f32_1-MLC',
   'qwen-1.5b-f16': 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',
   'qwen-0.5b':     'Qwen2.5-0.5B-Instruct-q4f32_1-MLC',
+  'qwen-0.5b-f16': 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC',
   'smollm-1.7b':   'SmolLM2-1.7B-Instruct-q4f32_1-MLC',
 };
 

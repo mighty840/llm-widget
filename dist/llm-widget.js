@@ -3,6 +3,7 @@ var e = {
 	"qwen-1.5b": "Qwen2.5-1.5B-Instruct-q4f32_1-MLC",
 	"qwen-1.5b-f16": "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
 	"qwen-0.5b": "Qwen2.5-0.5B-Instruct-q4f32_1-MLC",
+	"qwen-0.5b-f16": "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
 	"smollm-1.7b": "SmolLM2-1.7B-Instruct-q4f32_1-MLC"
 }, t = class {
 	constructor() {
@@ -286,10 +287,10 @@ async function b() {
 		gpuName: n || "Apple GPU",
 		vramMB: c,
 		tier: "mid",
-		recommendedModel: "qwen-0.5b",
+		recommendedModel: "qwen-0.5b-f16",
 		tierLabel: "Apple Silicon",
 		tierColor: "#00e5ff",
-		warning: "iOS WebGPU has a ~256 MB buffer limit. Using the 0.5B model to stay within it — larger models crash the tab."
+		warning: "iOS WebGPU has a 256 MB per-buffer cap. Using q4f16 to stay within it."
 	} : (o || c < 1500 ? (l = "low", u = "qwen-0.5b", d = "Integrated / Low VRAM", f = "#f59e0b", p = o ? "Integrated GPU detected. Running the lightweight 0.5B model to stay within your shared VRAM budget." : "Low VRAM detected. Using the 0.5B model for reliability.") : !s && c < 4096 ? (l = "mid", u = "qwen-1.5b", d = "Mid-range GPU", f = "#8b5cf6") : (l = "high", u = "qwen-1.5b", d = "Capable GPU", f = "#00e5ff"), {
 		ok: !0,
 		gpuName: n,
