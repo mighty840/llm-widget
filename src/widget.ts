@@ -250,6 +250,8 @@ export class LLMChatWidget extends HTMLElement {
   private lastProgressAt = 0;
   private hangTimer: ReturnType<typeof setTimeout> | null = null;
   private gpuProbe: GPUProbe | null = null;
+  private context = '';
+  private lastIndexedUrl = '';
 
   get aiName()   { return this.getAttribute('name')  ?? 'AI Assistant'; }
   get modelKey() { return this.getAttribute('model') ?? 'qwen-1.5b'; }
@@ -267,11 +269,32 @@ export class LLMChatWidget extends HTMLElement {
     if (this.rendered) return;
     this.rendered = true;
     this.render();
+    this.watchUrlChanges();
   }
 
   disconnectedCallback() {
     this.stopGeneration();
     this.engine.destroy();
+    window.removeEventListener('popstate', this.onUrlChange);
+  }
+
+  // Re-index when SPA navigates to a new page
+  private readonly onUrlChange = () => {
+    if (location.href !== this.lastIndexedUrl) this.reindex();
+  };
+
+  private watchUrlChanges() {
+    window.addEventListener('popstate', this.onUrlChange);
+    // Also catch pushState-based navigation via MutationObserver on <title>
+    const titleEl = document.querySelector('title');
+    if (titleEl) {
+      new MutationObserver(this.onUrlChange).observe(titleEl, { childList: true });
+    }
+  }
+
+  private reindex() {
+    this.context = collectContext();
+    this.lastIndexedUrl = location.href;
   }
 
   private render() {
@@ -470,7 +493,7 @@ export class LLMChatWidget extends HTMLElement {
 
     // Clear any existing hang warning timer and reset it
     if (this.hangTimer) clearTimeout(this.hangTimer);
-    this.hangTimer = setTimeout(() => this.showHangWarning(), 90_000); // 90s no progress = warn
+    this.hangTimer = setTimeout(() => this.showHangWarning(), 45_000); // 45s no progress = warn
 
     const bar      = this.shadow.getElementById('bar') as HTMLElement | null;
     const pctEl    = this.shadow.getElementById('prog-pct');
@@ -500,8 +523,16 @@ export class LLMChatWidget extends HTMLElement {
   private showHangWarning() {
     const hintEl  = this.shadow.getElementById('phase-hint');
     const titleEl = this.shadow.getElementById('phase-title');
-    if (hintEl)  hintEl.textContent  = '⚠ Taking longer than expected. Your GPU may be low on VRAM. Try closing other tabs or reloading.';
-    if (hintEl)  hintEl.style.color  = '#f87171';
+    if (hintEl) {
+      hintEl.innerHTML = `
+        <span style="color:#f59e0b">⚠ This is taking a while — not a bug.</span><br>
+        Your GPU is compiling WebGPU shaders for the first time. On integrated or low-end GPUs this can take 15–40 minutes.<br><br>
+        <strong style="color:#00e5ff">Good news:</strong> Chrome caches the compiled shaders. Every load after this will be instant. You only pay this cost once.
+      `;
+      hintEl.style.fontSize = '11px';
+      hintEl.style.lineHeight = '1.6';
+      hintEl.style.color = '#64748b';
+    }
     if (titleEl) titleEl.style.color = '#f59e0b';
   }
 
@@ -525,9 +556,12 @@ export class LLMChatWidget extends HTMLElement {
       this.status = 'loading';
       this.repaintBody();
 
-      await this.engine.load(modelToLoad, (pct, text) => {
-        this.updateProgress(pct, text);
-      });
+      // Index page content in parallel with model download — hides the ~2ms cost
+      // inside the 30-90s download. Captures page state at the moment user engaged.
+      const [,] = await Promise.all([
+        this.engine.load(modelToLoad, (pct, text) => this.updateProgress(pct, text)),
+        Promise.resolve().then(() => this.reindex()),
+      ]);
 
       this.status = 'ready';
       this.messages = [{ role: 'assistant', content: this.greeting }];
@@ -592,7 +626,8 @@ export class LLMChatWidget extends HTMLElement {
     const text = input?.value.trim();
     if (!text || this.generating) return;
 
-    const ctx = collectContext();
+    // Use cached context (indexed at load time, refreshed on URL change)
+    const ctx = this.context || collectContext();
 
     if (input) input.value = '';
     this.generating = true;
