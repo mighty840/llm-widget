@@ -8,8 +8,8 @@ try { gitHash = execSync('git rev-parse --short HEAD').toString().trim(); } catc
 
 export default defineConfig({
   define: {
-    __AXON_VERSION__: JSON.stringify(pkg.version),
-    __AXON_HASH__:    JSON.stringify(gitHash),
+    __IDJET_VERSION__: JSON.stringify(pkg.version),
+    __IDJET_HASH__:    JSON.stringify(gitHash),
   },
   build: {
     lib: {

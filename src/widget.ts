@@ -1,11 +1,11 @@
 import { InferenceEngine } from './engine';
 import { collectContext } from './indexer';
 
-declare const __AXON_VERSION__: string;
-declare const __AXON_HASH__: string;
-const AXON_VERSION = typeof __AXON_VERSION__ !== 'undefined' ? __AXON_VERSION__ : 'dev';
-const AXON_HASH    = typeof __AXON_HASH__    !== 'undefined' ? __AXON_HASH__    : '';
-console.info(`%cAxon v${AXON_VERSION}${AXON_HASH ? ` · ${AXON_HASH}` : ''} — WebGPU in-browser LLM`, 'color:#00e5ff;font-weight:bold');
+declare const __IDJET_VERSION__: string;
+declare const __IDJET_HASH__: string;
+const IDJET_VERSION = typeof __IDJET_VERSION__ !== 'undefined' ? __IDJET_VERSION__ : 'dev';
+const IDJET_HASH    = typeof __IDJET_HASH__    !== 'undefined' ? __IDJET_HASH__    : '';
+console.info(`%cIdjet v${IDJET_VERSION}${IDJET_HASH ? ` · ${IDJET_HASH}` : ''} — WebGPU in-browser LLM`, 'color:#00e5ff;font-weight:bold');
 
 type Status = 'idle' | 'loading' | 'ready' | 'error' | 'unsupported';
 interface Msg { role: 'user' | 'assistant'; content: string }
@@ -380,7 +380,7 @@ export class LLMChatWidget extends HTMLElement {
           <button class="btn-load" id="load">Load AI &rarr;</button>
           <p class="hint">Runs entirely in your browser &middot; no server &middot; cached after first load</p>
           <p class="hint" style="margin-top:8px;color:#1e3a4a;font-size:10px;letter-spacing:0.08em">
-            AXON v${AXON_VERSION}${AXON_HASH ? ` &middot; ${AXON_HASH}` : ''}
+            IDJET v${IDJET_VERSION}${IDJET_HASH ? ` &middot; ${IDJET_HASH}` : ''}
           </p>
         </div>`;
       }

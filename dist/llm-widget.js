@@ -247,8 +247,8 @@ function g() {
 }
 //#endregion
 //#region src/widget.ts
-var _ = "0.1.6", v = "406e78b";
-console.info(`%cAxon v${_}${` · ${v}`} — WebGPU in-browser LLM`, "color:#00e5ff;font-weight:bold");
+var _ = "0.1.6", v = "43b51c7";
+console.info(`%cIdjet v${_}${` · ${v}`} — WebGPU in-browser LLM`, "color:#00e5ff;font-weight:bold");
 function y(e) {
 	return e.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
 }
@@ -370,7 +370,7 @@ var w = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', m
           <button class="btn-load" id="load">Load AI &rarr;</button>
           <p class="hint">Runs entirely in your browser &middot; no server &middot; cached after first load</p>
           <p class="hint" style="margin-top:8px;color:#1e3a4a;font-size:10px;letter-spacing:0.08em">
-            AXON v${_}${` &middot; ${v}`}
+            IDJET v${_}${` &middot; ${v}`}
           </p>
         </div>`;
 			}

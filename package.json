@@ -1,7 +1,7 @@
 {
-  "name": "axon-widget",
+  "name": "idjet-widget",
   "version": "0.1.6",
-  "description": "Axon — drop-in AI chat powered by WebGPU. Runs a local LLM in the visitor's browser, zero server.",
+  "description": "Idjet — drop-in AI chat powered by WebGPU. Runs a local LLM in the visitor's browser, zero server.",
   "type": "module",
   "main": "dist/llm-widget.umd.cjs",
   "module": "dist/llm-widget.js",
