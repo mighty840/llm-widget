@@ -21,8 +21,11 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
 }
 
-// Patterns that indicate an integrated / low-VRAM GPU
-const INTEGRATED_PATTERNS = /renoir|vega\s*\d|radeon\s*graphics|uhd\s*graphics|iris|xe\s*graphics|mali|adreno|apple\s*m\d|integrated/i;
+// Patterns that indicate an integrated / low-VRAM GPU (excludes Apple Silicon — see below)
+const INTEGRATED_PATTERNS = /renoir|vega\s*\d|radeon\s*graphics|uhd\s*graphics|iris|xe\s*graphics|mali|adreno|integrated/i;
+// Apple Silicon Macs have large unified memory — treat them as high-end, not integrated.
+// (iOS Apple Silicon is handled separately via isIOS before tier logic runs.)
+const APPLE_SILICON_PATTERNS = /apple\s*m\d|apple\s*gpu/i;
 const HIGH_END_PATTERNS = /rtx\s*[234]\d{3}|rx\s*[67][89]\d{2}|rx\s*7\d{3}|a[456789]\d{3}|m[12]\s*(ultra|max|pro)/i;
 
 async function probeGPU(): Promise<GPUProbe> {
@@ -55,8 +58,9 @@ async function probeGPU(): Promise<GPUProbe> {
 
   // For integrated GPUs we can also look at system RAM
   const systemRamGB = nav.deviceMemory ?? 4;
-  const isIntegrated = INTEGRATED_PATTERNS.test(gpuName);
-  const isHighEnd    = HIGH_END_PATTERNS.test(gpuName);
+  const isIntegrated   = INTEGRATED_PATTERNS.test(gpuName);
+  const isAppleSilicon = APPLE_SILICON_PATTERNS.test(gpuName);
+  const isHighEnd      = HIGH_END_PATTERNS.test(gpuName) || isAppleSilicon;
 
   // Estimate usable VRAM
   let vramMB: number;
@@ -104,8 +108,8 @@ async function probeGPU(): Promise<GPUProbe> {
     tierColor = '#8b5cf6';
   } else {
     tier = 'high';
-    recommendedModel = 'qwen-1.5b';   // could serve larger models here
-    tierLabel = 'Capable GPU';
+    recommendedModel = 'qwen-1.5b';
+    tierLabel = isAppleSilicon ? 'Apple Silicon' : 'Capable GPU';
     tierColor = '#00e5ff';
   }
 

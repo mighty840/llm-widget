@@ -250,8 +250,8 @@ function g() {
 function _(e) {
 	return e.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
 }
-var v = /renoir|vega\s*\d|radeon\s*graphics|uhd\s*graphics|iris|xe\s*graphics|mali|adreno|apple\s*m\d|integrated/i, y = /rtx\s*[234]\d{3}|rx\s*[67][89]\d{2}|rx\s*7\d{3}|a[456789]\d{3}|m[12]\s*(ultra|max|pro)/i;
-async function b() {
+var v = /renoir|vega\s*\d|radeon\s*graphics|uhd\s*graphics|iris|xe\s*graphics|mali|adreno|integrated/i, y = /apple\s*m\d|apple\s*gpu/i, b = /rtx\s*[234]\d{3}|rx\s*[67][89]\d{2}|rx\s*7\d{3}|a[456789]\d{3}|m[12]\s*(ultra|max|pro)/i;
+async function x() {
 	let e = navigator;
 	if (!e.gpu) return {
 		ok: !1,
@@ -279,30 +279,30 @@ async function b() {
 		let e = await t.requestAdapterInfo?.();
 		n = e?.description || e?.device || n;
 	} catch {}
-	let r = t.limits.maxBufferSize ?? 0, i = Math.round(r / (1024 * 1024)), a = e.deviceMemory ?? 4, o = v.test(n), s = y.test(n), c;
-	c = o ? Math.min(i || 1024, Math.round(a * 256)) : i || (s ? 6144 : 2048);
-	let l, u, d, f, p;
+	let r = t.limits.maxBufferSize ?? 0, i = Math.round(r / (1024 * 1024)), a = e.deviceMemory ?? 4, o = v.test(n), s = y.test(n), c = b.test(n) || s, l;
+	l = o ? Math.min(i || 1024, Math.round(a * 256)) : i || (c ? 6144 : 2048);
+	let u, d, f, p, m;
 	return /iP(hone|ad|od)/.test(navigator.userAgent) ? {
 		ok: !0,
 		gpuName: n || "Apple GPU",
-		vramMB: c,
+		vramMB: l,
 		tier: "mid",
 		recommendedModel: "qwen-0.5b-f16",
 		tierLabel: "Apple Silicon",
 		tierColor: "#00e5ff",
 		warning: "iOS WebGPU has a 256 MB per-buffer cap. Using q4f16 to stay within it."
-	} : (o || c < 1500 ? (l = "low", u = "qwen-0.5b", d = "Integrated / Low VRAM", f = "#f59e0b", p = o ? "Integrated GPU detected. Running the lightweight 0.5B model to stay within your shared VRAM budget." : "Low VRAM detected. Using the 0.5B model for reliability.") : !s && c < 4096 ? (l = "mid", u = "qwen-1.5b", d = "Mid-range GPU", f = "#8b5cf6") : (l = "high", u = "qwen-1.5b", d = "Capable GPU", f = "#00e5ff"), {
+	} : (o || l < 1500 ? (u = "low", d = "qwen-0.5b", f = "Integrated / Low VRAM", p = "#f59e0b", m = o ? "Integrated GPU detected. Running the lightweight 0.5B model to stay within your shared VRAM budget." : "Low VRAM detected. Using the 0.5B model for reliability.") : !c && l < 4096 ? (u = "mid", d = "qwen-1.5b", f = "Mid-range GPU", p = "#8b5cf6") : (u = "high", d = "qwen-1.5b", f = s ? "Apple Silicon" : "Capable GPU", p = "#00e5ff"), {
 		ok: !0,
 		gpuName: n,
-		vramMB: c,
-		tier: l,
-		recommendedModel: u,
-		tierLabel: d,
-		tierColor: f,
-		warning: p
+		vramMB: l,
+		tier: u,
+		recommendedModel: d,
+		tierLabel: f,
+		tierColor: p,
+		warning: m
 	});
 }
-var x = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', monospace; }\n\n  .btn-trigger {\n    position: fixed; bottom: 24px; left: 24px; z-index: 2147483647;\n    width: 52px; height: 52px; border-radius: 50%;\n    background: linear-gradient(135deg, #00e5ff1a, #8b5cf61a);\n    border: 1px solid #00e5ff66;\n    backdrop-filter: blur(12px);\n    cursor: pointer; font-size: 20px;\n    display: flex; align-items: center; justify-content: center;\n    transition: transform 0.2s ease;\n    box-shadow: 0 0 20px rgba(0,229,255,0.15);\n    color: #e2e8f0;\n  }\n  .btn-trigger:hover { transform: scale(1.1); }\n\n  .panel {\n    position: fixed; bottom: 90px; left: 24px; z-index: 2147483646;\n    width: 360px; max-width: calc(100vw - 32px);\n    height: min(480px, calc(100dvh - 110px));\n    background: #0a0e1a;\n    border: 1px solid #1e2d4a;\n    border-radius: 16px;\n    display: flex; flex-direction: column;\n    overflow: hidden;\n    box-shadow: 0 0 50px rgba(139,92,246,0.12);\n    animation: slideUp 0.2s ease;\n  }\n  @keyframes slideUp {\n    from { opacity: 0; transform: translateY(12px); }\n    to   { opacity: 1; transform: translateY(0); }\n  }\n\n  /* Mobile responsive */\n  @media (max-width: 420px) {\n    .panel { width: calc(100vw - 16px); left: 8px; bottom: 80px; }\n    .btn-trigger { left: 12px; }\n  }\n\n  .header {\n    display: flex; align-items: center; gap: 10px;\n    padding: 12px 16px;\n    background: linear-gradient(90deg, #00e5ff0d, #8b5cf60d);\n    border-bottom: 1px solid #1e2d4a;\n    flex-shrink: 0;\n  }\n  .dot {\n    width: 7px; height: 7px; border-radius: 50%;\n    background: #475569; flex-shrink: 0;\n    transition: background 0.3s, box-shadow 0.3s;\n  }\n  .dot.live { background: #00e5ff; box-shadow: 0 0 8px #00e5ff; }\n  .title { font-size: 12px; font-weight: 900; color: #e2e8f0; letter-spacing: 0.1em; }\n  .subtitle { font-size: 11px; color: #475569; margin-left: auto; }\n\n  .body {\n    flex: 1; overflow-y: auto; padding: 14px;\n    display: flex; flex-direction: column; gap: 10px;\n    scrollbar-width: thin; scrollbar-color: #8b5cf6 #0f1629;\n  }\n\n  .center {\n    display: flex; flex-direction: column;\n    align-items: center; justify-content: center;\n    height: 100%; gap: 16px; text-align: center; padding: 0 20px;\n  }\n  .emoji { font-size: 40px; line-height: 1; }\n  .desc { font-size: 12px; color: #64748b; line-height: 1.6; }\n  .hint { font-size: 11px; color: #334155; }\n\n  .btn-load {\n    padding: 9px 28px; border-radius: 8px;\n    background: #00e5ff; color: #050810;\n    font-size: 13px; font-weight: 700; font-family: inherit;\n    border: none; cursor: pointer;\n    transition: opacity 0.2s;\n  }\n  .btn-load:hover { opacity: 0.88; }\n\n  .progress-bar-track {\n    width: 100%; height: 5px; background: #1e2d4a;\n    border-radius: 99px; overflow: hidden;\n  }\n  .progress-bar-fill {\n    height: 100%; width: 0%;\n    background: linear-gradient(90deg, #00e5ff, #8b5cf6);\n    border-radius: 99px; transition: width 0.4s ease;\n  }\n  .progress-label {\n    display: flex; justify-content: space-between;\n    margin-top: 6px; font-size: 11px;\n  }\n  .progress-text { color: #475569; }\n  .progress-pct  { color: #00e5ff; font-weight: 700; }\n\n  .msg { display: flex; }\n  .msg.user { justify-content: flex-end; }\n  .bubble {\n    max-width: 86%; font-size: 13px; line-height: 1.5;\n    border-radius: 12px; padding: 8px 12px;\n  }\n  .bubble.user {\n    background: #00e5ff15; border: 1px solid #00e5ff33; color: #e2e8f0;\n  }\n  .bubble.assistant {\n    background: #0f1629; border: 1px solid #1e2d4a; color: #94a3b8;\n  }\n\n  /* Typing dots animation */\n  @keyframes blink { 0%,80%,100%{opacity:0} 40%{opacity:1} }\n  .typing span { display:inline-block; width:5px; height:5px; border-radius:50%; background:#64748b; animation: blink 1.4s infinite both; }\n  .typing span:nth-child(2) { animation-delay:.2s }\n  .typing span:nth-child(3) { animation-delay:.4s }\n\n  .input-bar {\n    display: flex; gap: 8px; flex-shrink: 0;\n    padding: 10px 12px; border-top: 1px solid #1e2d4a;\n  }\n  .input {\n    flex: 1; background: #0f1629; border: 1px solid #1e2d4a;\n    border-radius: 8px; color: #e2e8f0; font-size: 13px;\n    font-family: inherit; padding: 8px 12px; outline: none;\n    transition: border-color 0.2s;\n  }\n  .input:focus { border-color: #8b5cf666; }\n  .input::placeholder { color: #334155; }\n  .btn-send {\n    padding: 8px 14px; border-radius: 8px; border: none;\n    font-size: 14px; font-family: inherit; font-weight: 700;\n    cursor: pointer; transition: background 0.2s, color 0.2s;\n    background: #00e5ff; color: #050810;\n  }\n  .btn-send:disabled { background: #1e2d4a; color: #475569; cursor: default; }\n\n  /* Stop button */\n  .btn-stop { padding:8px 12px; border-radius:8px; border:1px solid #ef444455; background:#ef444411; color:#f87171; font-size:12px; font-family:inherit; cursor:pointer; }\n  .btn-stop:hover { background:#ef444422; }\n", S = class extends HTMLElement {
+var S = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', monospace; }\n\n  .btn-trigger {\n    position: fixed; bottom: 24px; left: 24px; z-index: 2147483647;\n    width: 52px; height: 52px; border-radius: 50%;\n    background: linear-gradient(135deg, #00e5ff1a, #8b5cf61a);\n    border: 1px solid #00e5ff66;\n    backdrop-filter: blur(12px);\n    cursor: pointer; font-size: 20px;\n    display: flex; align-items: center; justify-content: center;\n    transition: transform 0.2s ease;\n    box-shadow: 0 0 20px rgba(0,229,255,0.15);\n    color: #e2e8f0;\n  }\n  .btn-trigger:hover { transform: scale(1.1); }\n\n  .panel {\n    position: fixed; bottom: 90px; left: 24px; z-index: 2147483646;\n    width: 360px; max-width: calc(100vw - 32px);\n    height: min(480px, calc(100dvh - 110px));\n    background: #0a0e1a;\n    border: 1px solid #1e2d4a;\n    border-radius: 16px;\n    display: flex; flex-direction: column;\n    overflow: hidden;\n    box-shadow: 0 0 50px rgba(139,92,246,0.12);\n    animation: slideUp 0.2s ease;\n  }\n  @keyframes slideUp {\n    from { opacity: 0; transform: translateY(12px); }\n    to   { opacity: 1; transform: translateY(0); }\n  }\n\n  /* Mobile responsive */\n  @media (max-width: 420px) {\n    .panel { width: calc(100vw - 16px); left: 8px; bottom: 80px; }\n    .btn-trigger { left: 12px; }\n  }\n\n  .header {\n    display: flex; align-items: center; gap: 10px;\n    padding: 12px 16px;\n    background: linear-gradient(90deg, #00e5ff0d, #8b5cf60d);\n    border-bottom: 1px solid #1e2d4a;\n    flex-shrink: 0;\n  }\n  .dot {\n    width: 7px; height: 7px; border-radius: 50%;\n    background: #475569; flex-shrink: 0;\n    transition: background 0.3s, box-shadow 0.3s;\n  }\n  .dot.live { background: #00e5ff; box-shadow: 0 0 8px #00e5ff; }\n  .title { font-size: 12px; font-weight: 900; color: #e2e8f0; letter-spacing: 0.1em; }\n  .subtitle { font-size: 11px; color: #475569; margin-left: auto; }\n\n  .body {\n    flex: 1; overflow-y: auto; padding: 14px;\n    display: flex; flex-direction: column; gap: 10px;\n    scrollbar-width: thin; scrollbar-color: #8b5cf6 #0f1629;\n  }\n\n  .center {\n    display: flex; flex-direction: column;\n    align-items: center; justify-content: center;\n    height: 100%; gap: 16px; text-align: center; padding: 0 20px;\n  }\n  .emoji { font-size: 40px; line-height: 1; }\n  .desc { font-size: 12px; color: #64748b; line-height: 1.6; }\n  .hint { font-size: 11px; color: #334155; }\n\n  .btn-load {\n    padding: 9px 28px; border-radius: 8px;\n    background: #00e5ff; color: #050810;\n    font-size: 13px; font-weight: 700; font-family: inherit;\n    border: none; cursor: pointer;\n    transition: opacity 0.2s;\n  }\n  .btn-load:hover { opacity: 0.88; }\n\n  .progress-bar-track {\n    width: 100%; height: 5px; background: #1e2d4a;\n    border-radius: 99px; overflow: hidden;\n  }\n  .progress-bar-fill {\n    height: 100%; width: 0%;\n    background: linear-gradient(90deg, #00e5ff, #8b5cf6);\n    border-radius: 99px; transition: width 0.4s ease;\n  }\n  .progress-label {\n    display: flex; justify-content: space-between;\n    margin-top: 6px; font-size: 11px;\n  }\n  .progress-text { color: #475569; }\n  .progress-pct  { color: #00e5ff; font-weight: 700; }\n\n  .msg { display: flex; }\n  .msg.user { justify-content: flex-end; }\n  .bubble {\n    max-width: 86%; font-size: 13px; line-height: 1.5;\n    border-radius: 12px; padding: 8px 12px;\n  }\n  .bubble.user {\n    background: #00e5ff15; border: 1px solid #00e5ff33; color: #e2e8f0;\n  }\n  .bubble.assistant {\n    background: #0f1629; border: 1px solid #1e2d4a; color: #94a3b8;\n  }\n\n  /* Typing dots animation */\n  @keyframes blink { 0%,80%,100%{opacity:0} 40%{opacity:1} }\n  .typing span { display:inline-block; width:5px; height:5px; border-radius:50%; background:#64748b; animation: blink 1.4s infinite both; }\n  .typing span:nth-child(2) { animation-delay:.2s }\n  .typing span:nth-child(3) { animation-delay:.4s }\n\n  .input-bar {\n    display: flex; gap: 8px; flex-shrink: 0;\n    padding: 10px 12px; border-top: 1px solid #1e2d4a;\n  }\n  .input {\n    flex: 1; background: #0f1629; border: 1px solid #1e2d4a;\n    border-radius: 8px; color: #e2e8f0; font-size: 13px;\n    font-family: inherit; padding: 8px 12px; outline: none;\n    transition: border-color 0.2s;\n  }\n  .input:focus { border-color: #8b5cf666; }\n  .input::placeholder { color: #334155; }\n  .btn-send {\n    padding: 8px 14px; border-radius: 8px; border: none;\n    font-size: 14px; font-family: inherit; font-weight: 700;\n    cursor: pointer; transition: background 0.2s, color 0.2s;\n    background: #00e5ff; color: #050810;\n  }\n  .btn-send:disabled { background: #1e2d4a; color: #475569; cursor: default; }\n\n  /* Stop button */\n  .btn-stop { padding:8px 12px; border-radius:8px; border:1px solid #ef444455; background:#ef444411; color:#f87171; font-size:12px; font-family:inherit; cursor:pointer; }\n  .btn-stop:hover { background:#ef444422; }\n", C = class extends HTMLElement {
 	get aiName() {
 		return this.getAttribute("name") ?? "AI Assistant";
 	}
@@ -333,7 +333,7 @@ var x = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', m
 	}
 	render() {
 		this.shadow.innerHTML = `
-      <style>${x}</style>
+      <style>${S}</style>
       <button class="btn-trigger" id="trigger" aria-label="Open AI chat">◈</button>
     `, this.shadow.getElementById("trigger").addEventListener("click", () => this.togglePanel());
 	}
@@ -421,7 +421,7 @@ var x = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', m
 				let e = document.createElement("div");
 				e.innerHTML = this.renderPanel();
 				let t = e.firstElementChild;
-				this.shadow.appendChild(t), this.status === "ready" && this.messages.forEach((e, t) => this.appendMessageToDOM(e, t)), this.bindPanelEvents(), setTimeout(() => this.shadow.getElementById("input")?.focus(), 50), !this.gpuProbe && this.status === "idle" && b().then((e) => {
+				this.shadow.appendChild(t), this.status === "ready" && this.messages.forEach((e, t) => this.appendMessageToDOM(e, t)), this.bindPanelEvents(), setTimeout(() => this.shadow.getElementById("input")?.focus(), 50), !this.gpuProbe && this.status === "idle" && x().then((e) => {
 					this.gpuProbe = e, this.status === "idle" && this.repaintBody();
 				});
 			}
@@ -443,7 +443,7 @@ var x = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', m
 		if (!this.loading) {
 			this.loading = !0;
 			try {
-				let e = this.gpuProbe ?? await b();
+				let e = this.gpuProbe ?? await x();
 				if (this.gpuProbe = e, !e.ok) {
 					this.errorMsg = _(e.reason ?? "WebGPU not available."), this.status = "error", this.repaintBody();
 					return;
@@ -534,12 +534,12 @@ ${n}`;
 };
 //#endregion
 //#region src/index.ts
-customElements.get("llm-chat") || customElements.define("llm-chat", S);
-function C() {
+customElements.get("llm-chat") || customElements.define("llm-chat", C);
+function w() {
 	let e = document.currentScript ?? document.querySelector("script[src*=\"llm-widget\"]");
 	if (e?.dataset.auto === "false" || document.querySelector("llm-chat")) return;
 	let t = document.createElement("llm-chat");
 	e?.dataset.name && t.setAttribute("name", e.dataset.name), e?.dataset.model && t.setAttribute("model", e.dataset.model), e?.dataset.greeting && t.setAttribute("greeting", e.dataset.greeting), document.body.appendChild(t);
 }
-document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", C) : C();
+document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", w) : w();
 //#endregion
