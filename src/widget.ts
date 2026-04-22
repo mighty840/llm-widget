@@ -1,0 +1,524 @@
+import { InferenceEngine } from './engine';
+import { collectContext } from './indexer';
+
+type Status = 'idle' | 'loading' | 'ready' | 'error' | 'unsupported';
+interface Msg { role: 'user' | 'assistant'; content: string }
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+}
+
+async function checkWebGPU(): Promise<{ ok: boolean; reason?: string }> {
+  const nav = navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } };
+  if (!nav.gpu) return { ok: false, reason: 'WebGPU API not available. Use Chrome 113+.' };
+  const adapter = await nav.gpu.requestAdapter();
+  if (!adapter) return { ok: false, reason: 'No GPU adapter found. Enable chrome://flags/#enable-unsafe-webgpu or install Vulkan drivers.' };
+  return { ok: true };
+}
+
+const CSS = `
+  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', monospace; }
+
+  .btn-trigger {
+    position: fixed; bottom: 24px; right: 24px; z-index: 2147483647;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: linear-gradient(135deg, #00e5ff1a, #8b5cf61a);
+    border: 1px solid #00e5ff66;
+    backdrop-filter: blur(12px);
+    cursor: pointer; font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.2s ease;
+    box-shadow: 0 0 20px rgba(0,229,255,0.15);
+    color: #e2e8f0;
+  }
+  .btn-trigger:hover { transform: scale(1.1); }
+
+  .panel {
+    position: fixed; bottom: 90px; right: 24px; z-index: 2147483646;
+    width: 360px; max-width: calc(100vw - 32px);
+    height: min(480px, calc(100dvh - 110px));
+    background: #0a0e1a;
+    border: 1px solid #1e2d4a;
+    border-radius: 16px;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 0 50px rgba(139,92,246,0.12);
+    animation: slideUp 0.2s ease;
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Mobile responsive */
+  @media (max-width: 420px) {
+    .panel { width: calc(100vw - 16px); right: 8px; bottom: 80px; }
+    .btn-trigger { right: 12px; }
+  }
+
+  .header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    background: linear-gradient(90deg, #00e5ff0d, #8b5cf60d);
+    border-bottom: 1px solid #1e2d4a;
+    flex-shrink: 0;
+  }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #475569; flex-shrink: 0;
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  .dot.live { background: #00e5ff; box-shadow: 0 0 8px #00e5ff; }
+  .title { font-size: 12px; font-weight: 900; color: #e2e8f0; letter-spacing: 0.1em; }
+  .subtitle { font-size: 11px; color: #475569; margin-left: auto; }
+
+  .body {
+    flex: 1; overflow-y: auto; padding: 14px;
+    display: flex; flex-direction: column; gap: 10px;
+    scrollbar-width: thin; scrollbar-color: #8b5cf6 #0f1629;
+  }
+
+  .center {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    height: 100%; gap: 16px; text-align: center; padding: 0 20px;
+  }
+  .emoji { font-size: 40px; line-height: 1; }
+  .desc { font-size: 12px; color: #64748b; line-height: 1.6; }
+  .hint { font-size: 11px; color: #334155; }
+
+  .btn-load {
+    padding: 9px 28px; border-radius: 8px;
+    background: #00e5ff; color: #050810;
+    font-size: 13px; font-weight: 700; font-family: inherit;
+    border: none; cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn-load:hover { opacity: 0.88; }
+
+  .progress-bar-track {
+    width: 100%; height: 5px; background: #1e2d4a;
+    border-radius: 99px; overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #00e5ff, #8b5cf6);
+    border-radius: 99px; transition: width 0.4s ease;
+  }
+  .progress-label {
+    display: flex; justify-content: space-between;
+    margin-top: 6px; font-size: 11px;
+  }
+  .progress-text { color: #475569; }
+  .progress-pct  { color: #00e5ff; font-weight: 700; }
+
+  .msg { display: flex; }
+  .msg.user { justify-content: flex-end; }
+  .bubble {
+    max-width: 86%; font-size: 13px; line-height: 1.5;
+    border-radius: 12px; padding: 8px 12px;
+  }
+  .bubble.user {
+    background: #00e5ff15; border: 1px solid #00e5ff33; color: #e2e8f0;
+  }
+  .bubble.assistant {
+    background: #0f1629; border: 1px solid #1e2d4a; color: #94a3b8;
+  }
+
+  /* Typing dots animation */
+  @keyframes blink { 0%,80%,100%{opacity:0} 40%{opacity:1} }
+  .typing span { display:inline-block; width:5px; height:5px; border-radius:50%; background:#64748b; animation: blink 1.4s infinite both; }
+  .typing span:nth-child(2) { animation-delay:.2s }
+  .typing span:nth-child(3) { animation-delay:.4s }
+
+  .input-bar {
+    display: flex; gap: 8px; flex-shrink: 0;
+    padding: 10px 12px; border-top: 1px solid #1e2d4a;
+  }
+  .input {
+    flex: 1; background: #0f1629; border: 1px solid #1e2d4a;
+    border-radius: 8px; color: #e2e8f0; font-size: 13px;
+    font-family: inherit; padding: 8px 12px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .input:focus { border-color: #8b5cf666; }
+  .input::placeholder { color: #334155; }
+  .btn-send {
+    padding: 8px 14px; border-radius: 8px; border: none;
+    font-size: 14px; font-family: inherit; font-weight: 700;
+    cursor: pointer; transition: background 0.2s, color 0.2s;
+    background: #00e5ff; color: #050810;
+  }
+  .btn-send:disabled { background: #1e2d4a; color: #475569; cursor: default; }
+
+  /* Stop button */
+  .btn-stop { padding:8px 12px; border-radius:8px; border:1px solid #ef444455; background:#ef444411; color:#f87171; font-size:12px; font-family:inherit; cursor:pointer; }
+  .btn-stop:hover { background:#ef444422; }
+`;
+
+export class LLMChatWidget extends HTMLElement {
+  private shadow: ShadowRoot;
+  private engine = new InferenceEngine();
+  private status: Status = 'idle';
+  private errorMsg = '';
+  private messages: Msg[] = [];
+  private generating = false;
+  private loading = false;
+  private panelVisible = false;
+  private rendered = false;
+
+  get aiName()   { return this.getAttribute('name')  ?? 'AI Assistant'; }
+  get modelKey() { return this.getAttribute('model') ?? 'qwen-1.5b'; }
+  get greeting() {
+    return this.getAttribute('greeting') ??
+      "Hi! I'm an AI assistant running entirely in your browser. Ask me anything about this page.";
+  }
+
+  constructor() {
+    super();
+    this.shadow = this.attachShadow({ mode: 'open' });
+  }
+
+  connectedCallback() {
+    if (this.rendered) return;
+    this.rendered = true;
+    this.render();
+  }
+
+  disconnectedCallback() {
+    this.stopGeneration();
+    this.engine.destroy();
+  }
+
+  private render() {
+    this.shadow.innerHTML = `
+      <style>${CSS}</style>
+      <button class="btn-trigger" id="trigger" aria-label="Open AI chat">◈</button>
+    `;
+    this.shadow.getElementById('trigger')!
+      .addEventListener('click', () => this.togglePanel());
+  }
+
+  private renderPanel(): string {
+    return `
+      <div class="panel" id="panel" role="dialog" aria-label="AI Chat" aria-modal="true">
+        <div class="header">
+          <span class="dot ${this.status === 'ready' ? 'live' : ''}"></span>
+          <span class="title">${escapeHtml(this.aiName.toUpperCase())}</span>
+          <span class="subtitle">${escapeHtml(this.statusLabel())}</span>
+        </div>
+        <div class="body" id="body" aria-live="polite">${this.renderBody()}</div>
+        ${this.status === 'ready' ? `
+        <div class="input-bar">
+          <input class="input" id="input" placeholder="Ask something..." autocomplete="off" ${this.generating ? 'disabled' : ''} />
+          ${this.generating
+            ? `<button class="btn-stop" id="stop">&#9632; Stop</button>`
+            : `<button class="btn-send" id="send">&#8593;</button>`
+          }
+        </div>` : ''}
+      </div>
+    `;
+  }
+
+  private renderBody(): string {
+    switch (this.status) {
+      case 'idle': return `
+        <div class="center">
+          <span class="emoji">&#129504;</span>
+          <p class="desc">
+            A language model that runs directly in your browser using your GPU.
+            <br><br>
+            <span style="color:#475569">~900 MB &middot; cached after first load &middot; no server</span>
+          </p>
+          <button class="btn-load" id="load">Load AI &rarr;</button>
+          <p class="hint">Chrome 113+ &middot; WebGPU required</p>
+        </div>`;
+
+      case 'loading': return `
+        <div class="center">
+          <p style="font-size:13px;font-weight:700;color:#00e5ff">Downloading model weights</p>
+          <div style="width:100%">
+            <div class="progress-bar-track">
+              <div class="progress-bar-fill" id="bar"></div>
+            </div>
+            <div class="progress-label">
+              <span class="progress-text" id="prog-text"></span>
+              <span class="progress-pct" id="prog-pct">0%</span>
+            </div>
+          </div>
+          <p class="hint">Cached to your browser after this</p>
+        </div>`;
+
+      case 'unsupported': return `
+        <div class="center">
+          <span class="emoji">&#9888;</span>
+          <p class="desc">WebGPU is not available in this browser.</p>
+          <p class="hint">Try Chrome 113+ on a desktop machine.</p>
+        </div>`;
+
+      case 'error': return `
+        <div class="center">
+          <span class="emoji">&#10005;</span>
+          <p class="desc" style="color:#f87171;margin-bottom:4px">Failed to load model.</p>
+          <p class="hint" style="color:#64748b;font-size:11px;line-height:1.5;margin-bottom:8px">${escapeHtml(this.errorMsg)}</p>
+          ${(this.errorMsg.includes('adapter') || this.errorMsg.includes('GPU') || this.errorMsg.includes('shader')) ? `
+          <p class="hint" style="margin-bottom:8px">On Chrome/Linux: chrome://flags/#enable-unsafe-webgpu &rarr; Enable</p>` : ''}
+          <button class="btn-load" id="retry">Try again</button>
+        </div>`;
+
+      case 'ready':
+        // Messages are populated via appendMessageToDOM
+        return '';
+    }
+  }
+
+  private statusLabel(): string {
+    if (this.status === 'ready')    return `${this.modelKey} · WebGPU`;
+    if (this.status === 'loading')  return 'loading...';
+    return 'offline';
+  }
+
+  private appendMessageToDOM(msg: Msg, idx: number): void {
+    const body = this.shadow.getElementById('body');
+    if (!body) return;
+    const row = document.createElement('div');
+    row.className = `msg ${msg.role}`;
+    const bubble = document.createElement('div');
+    bubble.className = `bubble ${msg.role}`;
+    bubble.id = `msg-${idx}`;
+    bubble.setAttribute('role', msg.role === 'assistant' ? 'status' : 'none');
+    if (msg.content) {
+      bubble.textContent = msg.content;
+    } else {
+      // Typing indicator
+      bubble.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+    }
+    row.appendChild(bubble);
+    body.appendChild(row);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  private patchLastMessage(delta: string): void {
+    this.messages[this.messages.length - 1].content += delta;
+    const idx = this.messages.length - 1;
+    const bubble = this.shadow.getElementById(`msg-${idx}`);
+    if (bubble) {
+      bubble.textContent = this.messages[idx].content;
+      const body = this.shadow.getElementById('body');
+      if (body) body.scrollTop = body.scrollHeight;
+    }
+  }
+
+  private bindPanelEvents() {
+    this.shadow.getElementById('load')?.addEventListener('click', () => this.loadModel());
+
+    this.shadow.getElementById('retry')?.addEventListener('click', () => {
+      this.status = 'idle';
+      this.errorMsg = '';
+      this.rebuildPanel();
+    });
+
+    const input = this.shadow.getElementById('input') as HTMLInputElement | null;
+    input?.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void this.send(); }
+    });
+
+    this.shadow.getElementById('send')?.addEventListener('click', () => void this.send());
+    this.shadow.getElementById('stop')?.addEventListener('click', () => this.stopGeneration());
+
+    const panel = this.shadow.getElementById('panel');
+    panel?.addEventListener('keydown', (e: Event) => {
+      if ((e as KeyboardEvent).key === 'Escape') this.togglePanel();
+    });
+  }
+
+  private togglePanel() {
+    this.panelVisible = !this.panelVisible;
+    const trigger = this.shadow.getElementById('trigger')!;
+    trigger.textContent = this.panelVisible ? '✕' : '◈';
+
+    const existing = this.shadow.getElementById('panel');
+    if (this.panelVisible) {
+      if (!existing) {
+        const div = document.createElement('div');
+        div.innerHTML = this.renderPanel();
+        const panel = div.firstElementChild!;
+        this.shadow.appendChild(panel);
+        if (this.status === 'ready') {
+          this.messages.forEach((m, i) => this.appendMessageToDOM(m, i));
+        }
+        this.bindPanelEvents();
+        setTimeout(() => (this.shadow.getElementById('input') as HTMLInputElement | null)?.focus(), 50);
+      }
+    } else {
+      if (this.generating) this.stopGeneration();
+      existing?.remove();
+    }
+  }
+
+  private updateProgress(pct: number, text: string) {
+    const bar    = this.shadow.getElementById('bar') as HTMLElement | null;
+    const pctEl  = this.shadow.getElementById('prog-pct');
+    const textEl = this.shadow.getElementById('prog-text');
+    if (bar)    bar.style.width = `${pct}%`;
+    if (pctEl)  pctEl.textContent = `${pct}%`;
+    if (textEl) textEl.textContent = text.slice(0, 45);
+  }
+
+  private async loadModel() {
+    if (this.loading) return;
+    this.loading = true;
+    try {
+      const gpu = await checkWebGPU();
+      if (!gpu.ok) {
+        this.errorMsg = escapeHtml(gpu.reason ?? 'WebGPU not available.');
+        this.status = 'error';
+        this.repaintBody();
+        return;
+      }
+
+      this.status = 'loading';
+      this.repaintBody();
+
+      await this.engine.load(this.modelKey, (pct, text) => {
+        this.updateProgress(pct, text);
+      });
+
+      this.status = 'ready';
+      this.messages = [{ role: 'assistant', content: this.greeting }];
+      this.rebuildPanel();
+    } catch (err) {
+      console.error('[llm-widget]', err);
+      const raw = err instanceof Error ? err.message.slice(0, 160) : String(err).slice(0, 160);
+      this.errorMsg = escapeHtml(raw);
+      this.status = 'error';
+      this.repaintBody();
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  private repaintBody() {
+    const body = this.shadow.getElementById('body');
+    if (!body) return;
+    body.innerHTML = this.renderBody();
+    if (this.status === 'ready') {
+      this.messages.forEach((m, i) => this.appendMessageToDOM(m, i));
+      body.scrollTop = body.scrollHeight;
+    }
+    this.bindPanelEvents();
+  }
+
+  private rebuildPanel() {
+    const panel = this.shadow.getElementById('panel');
+    if (!panel) return;
+    panel.innerHTML = `
+      <div class="header">
+        <span class="dot ${this.status === 'ready' ? 'live' : ''}"></span>
+        <span class="title">${escapeHtml(this.aiName.toUpperCase())}</span>
+        <span class="subtitle">${escapeHtml(this.statusLabel())}</span>
+      </div>
+      <div class="body" id="body" aria-live="polite">${this.renderBody()}</div>
+      ${this.status === 'ready' ? `
+      <div class="input-bar">
+        <input class="input" id="input" placeholder="Ask something..." autocomplete="off" />
+        <button class="btn-send" id="send">&#8593;</button>
+      </div>` : ''}
+    `;
+    if (this.status === 'ready') {
+      this.messages.forEach((m, i) => this.appendMessageToDOM(m, i));
+    }
+    this.bindPanelEvents();
+  }
+
+  private stopGeneration(): void {
+    if (!this.generating) return;
+    this.engine.interrupt();
+    this.generating = false;
+    const send = this.shadow.getElementById('send') as HTMLButtonElement | null;
+    const stop = this.shadow.getElementById('stop');
+    if (send) { send.disabled = false; send.textContent = '↑'; }
+    stop?.remove();
+  }
+
+  private async send() {
+    const input = this.shadow.getElementById('input') as HTMLInputElement | null;
+    const text = input?.value.trim();
+    if (!text || this.generating) return;
+
+    const ctx = collectContext();
+
+    if (input) input.value = '';
+    this.generating = true;
+
+    // Immediately disable send in DOM
+    const sendBtn = this.shadow.getElementById('send') as HTMLButtonElement | null;
+    if (sendBtn) {
+      sendBtn.disabled = true;
+      sendBtn.textContent = '·';
+    }
+
+    // Show stop button
+    const inputBar = sendBtn?.parentElement;
+    if (inputBar && !this.shadow.getElementById('stop')) {
+      const stopBtn = document.createElement('button');
+      stopBtn.className = 'btn-stop';
+      stopBtn.id = 'stop';
+      stopBtn.textContent = '■ Stop';
+      stopBtn.addEventListener('click', () => this.stopGeneration());
+      if (sendBtn) {
+        inputBar.replaceChild(stopBtn, sendBtn);
+      } else {
+        inputBar.appendChild(stopBtn);
+      }
+    }
+
+    if (input) input.disabled = true;
+
+    const history = this.messages.slice(1); // skip greeting
+    this.messages.push({ role: 'user', content: text });
+    this.appendMessageToDOM(this.messages[this.messages.length - 1], this.messages.length - 1);
+
+    this.messages.push({ role: 'assistant', content: '' });
+    this.appendMessageToDOM(this.messages[this.messages.length - 1], this.messages.length - 1);
+
+    const systemPrompt = `You are a helpful assistant on a website.
+Answer questions concisely based on the page context below.
+If something is not covered, say so honestly.
+
+Page context:
+${ctx}`;
+
+    try {
+      for await (const delta of this.engine.generate(systemPrompt, history, text)) {
+        this.patchLastMessage(delta);
+      }
+    } catch {
+      this.patchLastMessage(' [error: generation failed]');
+    } finally {
+      this.generating = false;
+      // Restore input bar
+      const inputBarEl = this.shadow.querySelector('.input-bar') as HTMLElement | null;
+      if (inputBarEl) {
+        const stopEl = this.shadow.getElementById('stop');
+        if (stopEl) stopEl.remove();
+        let existingSend = this.shadow.getElementById('send') as HTMLButtonElement | null;
+        if (!existingSend) {
+          existingSend = document.createElement('button');
+          existingSend.className = 'btn-send';
+          existingSend.id = 'send';
+          existingSend.textContent = '↑';
+          existingSend.addEventListener('click', () => void this.send());
+          inputBarEl.appendChild(existingSend);
+        }
+        existingSend.disabled = false;
+        existingSend.textContent = '↑';
+      }
+      const inputEl = this.shadow.getElementById('input') as HTMLInputElement | null;
+      if (inputEl) {
+        inputEl.disabled = false;
+        inputEl.focus();
+      }
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "llm-widget",
+  "version": "0.1.0",
+  "description": "Drop-in AI chat widget powered by WebGPU — runs a local LLM in the visitor's browser",
+  "type": "module",
+  "main": "dist/llm-widget.umd.cjs",
+  "module": "dist/llm-widget.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "homepage": "https://mighty840.github.io/llm-widget",
+  "repository": { "type": "git", "url": "https://github.com/mighty840/llm-widget.git" },
+  "files": ["dist", "src", "index.html"],
+  "keywords": ["webgpu", "llm", "wasm", "chat-widget", "in-browser-ai"],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite": "^8.0.9"
+  },
+  "dependencies": {
+    "@mlc-ai/web-llm": "^0.2.82"
+  }
+}

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>llm-widget demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #050810;
+      color: #e2e8f0;
+      font-family: ui-monospace, monospace;
+      padding: 60px 40px;
+      max-width: 800px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    h1 { font-size: 2rem; color: #00e5ff; margin-bottom: 8px; }
+    h2 { font-size: 1.1rem; color: #8b5cf6; margin: 32px 0 8px; }
+    p  { color: #64748b; font-size: 14px; margin-bottom: 12px; }
+    code {
+      background: #0f1629;
+      border: 1px solid #1e2d4a;
+      border-radius: 6px;
+      padding: 12px 16px;
+      display: block;
+      font-size: 13px;
+      color: #94a3b8;
+      margin: 8px 0;
+    }
+    #about    { margin-top: 40px; }
+    #projects { margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <h1>llm-widget</h1>
+  <p>Drop-in AI chat — runs a 1.5B LLM in your browser via WebGPU. No server. No API key.</p>
+
+  <h2>Usage</h2>
+  <code>&lt;script src="llm-widget.iife.js"
+  data-name="My Assistant"
+  data-model="qwen-1.5b"&gt;&lt;/script&gt;</code>
+
+  <section id="about">
+    <h2>About</h2>
+    <p>This is a demo page for the llm-widget. The AI reads this page's visible text
+    and uses it as context to answer questions. No embeddings, no vector DB.</p>
+  </section>
+
+  <section id="projects">
+    <h2>Projects</h2>
+    <p>Orca — Rust/Wasm container orchestrator filling the gap between Coolify and Kubernetes.</p>
+    <p>SwarmHaul — multi-agent coordination protocol on Solana for logistics automation.</p>
+    <p>SIGNAL DECK — autonomous YouTube music channel powered by AI-generated audio.</p>
+    <p>llm-widget — in-browser LLM via WebGPU, drop-in chat widget for any website.</p>
+  </section>
+
+  <script type="module" src="/src/index.ts" data-name="Page AI" data-model="qwen-1.5b"></script>
+</body>
+</html>
