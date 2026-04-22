@@ -7,13 +7,13 @@ const IDJET_VERSION = typeof __IDJET_VERSION__ !== 'undefined' ? __IDJET_VERSION
 const IDJET_HASH    = typeof __IDJET_HASH__    !== 'undefined' ? __IDJET_HASH__    : '';
 console.info(`%cIdjet v${IDJET_VERSION}${IDJET_HASH ? ` · ${IDJET_HASH}` : ''} — WebGPU in-browser LLM`, 'color:#00e5ff;font-weight:bold');
 
-type Status = 'idle' | 'loading' | 'ready' | 'error' | 'unsupported';
+type Status = 'idle' | 'loading' | 'ready' | 'error';
 interface Msg { role: 'user' | 'assistant'; content: string }
 
-type GPUTier = 'low' | 'mid' | 'high';
+type GPUTier = 'cpu' | 'low' | 'mid' | 'high';
 interface GPUProbe {
-  ok: boolean;
-  reason?: string;
+  ok: boolean;         // always true — CPU is the fallback, never a hard failure
+  device: 'webgpu' | 'wasm';
   gpuName: string;
   vramMB: number;
   tier: GPUTier;
@@ -41,13 +41,20 @@ async function probeGPU(): Promise<GPUProbe> {
   };
   const nav = navigator as NavWithGPU;
 
+  const cpuFallback = (label: string, warning: string): GPUProbe => ({
+    ok: true, device: 'wasm',
+    gpuName: 'CPU', vramMB: 0, tier: 'cpu',
+    recommendedModel: 'cpu-sm',
+    tierLabel: label, tierColor: '#64748b', warning,
+  });
+
   if (!nav.gpu) {
-    return { ok: false, reason: 'WebGPU API not available. Use Chrome 113+.', gpuName: 'Unknown', vramMB: 0, tier: 'low', recommendedModel: 'qwen-0.5b', tierLabel: '', tierColor: '' };
+    return cpuFallback('CPU Mode', 'WebGPU not available — falling back to CPU inference via WebAssembly. Works on any device, ~1 tok/sec.');
   }
 
-  const adapter = await nav.gpu.requestAdapter();
+  const adapter = await nav.gpu.requestAdapter().catch(() => null);
   if (!adapter) {
-    return { ok: false, reason: 'No GPU adapter found. Try enabling chrome://flags/#enable-unsafe-webgpu or updating GPU drivers.', gpuName: 'Unknown', vramMB: 0, tier: 'low', recommendedModel: 'qwen-0.5b', tierLabel: '', tierColor: '' };
+    return cpuFallback('CPU Mode', 'No GPU adapter found — falling back to CPU inference.');
   }
 
   // Get GPU name — requestAdapterInfo() is Chrome 121+
@@ -88,28 +95,22 @@ async function probeGPU(): Promise<GPUProbe> {
   // Detect via UA (no reliable API alternative) and cap at 0.5b before any tier logic.
   const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
   if (isIOS) {
-    // q4f32 packs the embedding table into a single ~272 MB buffer that exceeds
-    // iOS Safari's 256 MB per-buffer WebGPU cap. q4f16 halves that to ~136 MB.
-    return {
-      ok: true, gpuName: gpuName || 'Apple GPU', vramMB,
-      tier: 'mid', recommendedModel: 'qwen-0.5b-f16',
-      tierLabel: 'Apple Silicon',
-      tierColor: '#00e5ff',
-      warning: 'iOS WebGPU has a 256 MB per-buffer cap. Using q4f16 to stay within it.',
-    };
+    // iOS WebGPU has a 256 MB per-buffer cap that crashes the tab on larger models.
+    // CPU inference (WASM) is safer and universally supported on iOS Safari.
+    return cpuFallback('iOS CPU Mode', 'Using CPU inference on iOS — WebGPU buffer limits crash the tab on models >256 MB.');
   }
 
   if (isIntegrated || vramMB < 1500) {
     tier = 'low';
-    recommendedModel = 'qwen-0.5b';   // ~400 MB
+    recommendedModel = 'qwen-0.5b';
     tierLabel = 'Integrated / Low VRAM';
     tierColor = '#f59e0b';
     warning = isIntegrated
-      ? 'Integrated GPU detected. Running the lightweight 0.5B model to stay within your shared VRAM budget.'
-      : 'Low VRAM detected. Using the 0.5B model for reliability.';
+      ? 'Integrated GPU — using the 0.5B model to stay within shared VRAM.'
+      : 'Low VRAM — using the 0.5B model for reliability.';
   } else if (!isHighEnd && vramMB < 4096) {
     tier = 'mid';
-    recommendedModel = 'qwen-1.5b';   // ~1.5 GB q4f32
+    recommendedModel = 'qwen-1.5b';
     tierLabel = 'Mid-range GPU';
     tierColor = '#8b5cf6';
   } else {
@@ -119,7 +120,7 @@ async function probeGPU(): Promise<GPUProbe> {
     tierColor = '#00e5ff';
   }
 
-  return { ok: true, gpuName, vramMB, tier, recommendedModel, tierLabel, tierColor, warning };
+  return { ok: true, device: 'webgpu', gpuName, vramMB, tier, recommendedModel, tierLabel, tierColor, warning };
 }
 
 const CSS = `
@@ -363,11 +364,12 @@ export class LLMChatWidget extends HTMLElement {
         const modelInfo = p?.ok
           ? `Model: <strong style="color:#e2e8f0">${escapeHtml(p.recommendedModel)}</strong>`
           : 'Model: auto-selected based on your GPU';
-        const sizeInfo = p?.recommendedModel === 'qwen-0.5b'
-          ? '~400 MB · fast on integrated GPUs'
-          : p?.recommendedModel === 'qwen-1.5b'
-          ? '~1.5 GB · best quality for mid-range+'
-          : '~400 MB · cached after first load';
+        const sizeInfo: Record<string, string> = {
+          'cpu-sm':    '~200 MB · CPU/WASM · works everywhere',
+          'qwen-0.5b': '~400 MB · WebGPU · fast on integrated',
+          'qwen-1.5b': '~900 MB · WebGPU · best quality',
+        };
+        const sizeLabel = (p?.recommendedModel && sizeInfo[p.recommendedModel]) ?? '~200-900 MB · cached after first load';
         const warningHtml = p?.warning
           ? `<p class="hint" style="color:#f59e0b;margin-top:-4px">${escapeHtml(p.warning)}</p>`
           : '';
@@ -375,7 +377,7 @@ export class LLMChatWidget extends HTMLElement {
         <div class="center">
           <span class="emoji">&#129504;</span>
           <p class="desc" style="margin-bottom:4px">${gpuLine}</p>
-          <p class="desc" style="color:#475569;font-size:11px;margin-bottom:8px">${modelInfo} &middot; ${sizeInfo}</p>
+          <p class="desc" style="color:#475569;font-size:11px;margin-bottom:8px">${modelInfo} &middot; ${sizeLabel}</p>
           ${warningHtml}
           <button class="btn-load" id="load">Load AI &rarr;</button>
           <p class="hint">Runs entirely in your browser &middot; no server &middot; cached after first load</p>
@@ -400,20 +402,11 @@ export class LLMChatWidget extends HTMLElement {
           <p id="phase-hint" class="hint">Cached to your browser after this</p>
         </div>`;
 
-      case 'unsupported': return `
-        <div class="center">
-          <span class="emoji">&#9888;</span>
-          <p class="desc">WebGPU is not available in this browser.</p>
-          <p class="hint">Try Chrome 113+ on a desktop machine.</p>
-        </div>`;
-
       case 'error': return `
         <div class="center">
           <span class="emoji">&#10005;</span>
           <p class="desc" style="color:#f87171;margin-bottom:4px">Failed to load model.</p>
           <p class="hint" style="color:#64748b;font-size:11px;line-height:1.5;margin-bottom:8px">${escapeHtml(this.errorMsg)}</p>
-          ${(this.errorMsg.includes('adapter') || this.errorMsg.includes('GPU') || this.errorMsg.includes('shader')) ? `
-          <p class="hint" style="margin-bottom:8px">On Chrome/Linux: chrome://flags/#enable-unsafe-webgpu &rarr; Enable</p>` : ''}
           <button class="btn-load" id="retry">Try again</button>
         </div>`;
 
@@ -568,29 +561,18 @@ export class LLMChatWidget extends HTMLElement {
     if (this.loading) return;
     this.loading = true;
     try {
-      // Use cached probe result or run it now
       const probe = this.gpuProbe ?? await probeGPU();
       this.gpuProbe = probe;
-      if (!probe.ok) {
-        this.errorMsg = escapeHtml(probe.reason ?? 'WebGPU not available.');
-        this.status = 'error';
-        this.repaintBody();
-        return;
-      }
-
-      // Probe wins on constrained devices — the attribute is a developer hint, not a
-      // hard requirement. On iOS (~256 MB WebGPU buffer cap) or low-VRAM GPUs the
-      // probe's recommendation is safety-critical; ignoring it crashes the tab.
+      // probe.ok is always true — CPU (wasm) is the universal fallback.
+      // Attribute model only honoured on high-end GPU; probe wins elsewhere.
       const attrModel = this.getAttribute('model');
       const modelToLoad = (probe.tier === 'high' && attrModel) ? attrModel : probe.recommendedModel;
 
       this.status = 'loading';
       this.repaintBody();
 
-      // Index page content in parallel with model download — hides the ~2ms cost
-      // inside the 30-90s download. Captures page state at the moment user engaged.
       const [,] = await Promise.all([
-        this.engine.load(modelToLoad, (pct, text) => this.updateProgress(pct, text)),
+        this.engine.load(modelToLoad, probe.device, (pct, text) => this.updateProgress(pct, text)),
         Promise.resolve().then(() => this.reindex()),
       ]);
 

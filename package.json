@@ -11,9 +11,22 @@
     "preview": "vite preview"
   },
   "homepage": "https://mighty840.github.io/llm-widget",
-  "repository": { "type": "git", "url": "https://github.com/mighty840/llm-widget.git" },
-  "files": ["dist", "src", "index.html"],
-  "keywords": ["webgpu", "llm", "wasm", "chat-widget", "in-browser-ai"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mighty840/llm-widget.git"
+  },
+  "files": [
+    "dist",
+    "src",
+    "index.html"
+  ],
+  "keywords": [
+    "webgpu",
+    "llm",
+    "wasm",
+    "chat-widget",
+    "in-browser-ai"
+  ],
   "license": "MIT",
   "devDependencies": {
     "typescript": "^6.0.3",
