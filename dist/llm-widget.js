@@ -447,9 +447,9 @@ var x = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', m
 					this.errorMsg = _(e.reason ?? "WebGPU not available."), this.status = "error", this.repaintBody();
 					return;
 				}
-				let t = this.getAttribute("model") ?? e.recommendedModel;
+				let t = this.getAttribute("model"), n = e.tier === "high" && t ? t : e.recommendedModel;
 				this.status = "loading", this.repaintBody();
-				let [,] = await Promise.all([this.engine.load(t, (e, t) => this.updateProgress(e, t)), Promise.resolve().then(() => this.reindex())]);
+				let [,] = await Promise.all([this.engine.load(n, (e, t) => this.updateProgress(e, t)), Promise.resolve().then(() => this.reindex())]);
 				this.status = "ready", this.messages = [{
 					role: "assistant",
 					content: this.greeting

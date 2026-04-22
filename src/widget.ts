@@ -563,8 +563,11 @@ export class LLMChatWidget extends HTMLElement {
         return;
       }
 
-      // Use probed recommended model; fall back to attribute override if explicitly set
-      const modelToLoad = this.getAttribute('model') ?? probe.recommendedModel;
+      // Probe wins on constrained devices — the attribute is a developer hint, not a
+      // hard requirement. On iOS (~256 MB WebGPU buffer cap) or low-VRAM GPUs the
+      // probe's recommendation is safety-critical; ignoring it crashes the tab.
+      const attrModel = this.getAttribute('model');
+      const modelToLoad = (probe.tier === 'high' && attrModel) ? attrModel : probe.recommendedModel;
 
       this.status = 'loading';
       this.repaintBody();
