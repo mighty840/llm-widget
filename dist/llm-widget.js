@@ -313,7 +313,7 @@ function b() {
 }
 //#endregion
 //#region src/widget.ts
-var x = "0.1.6", S = "f29f13f";
+var x = "0.2.1", S = "9dffda2";
 console.info(`%cIdjet v${x}${` · ${S}`} — WebGPU in-browser LLM`, "color:#00e5ff;font-weight:bold");
 function C(e) {
 	return e.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
