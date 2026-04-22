@@ -1,7 +1,16 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import { execSync } from 'child_process';
+import pkg from './package.json';
+
+let gitHash = 'dev';
+try { gitHash = execSync('git rev-parse --short HEAD').toString().trim(); } catch { /* no git */ }
 
 export default defineConfig({
+  define: {
+    __AXON_VERSION__: JSON.stringify(pkg.version),
+    __AXON_HASH__:    JSON.stringify(gitHash),
+  },
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
