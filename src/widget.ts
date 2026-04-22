@@ -74,6 +74,19 @@ async function probeGPU(): Promise<GPUProbe> {
   let tierColor: string;
   let warning: string | undefined;
 
+  // iOS Safari has a ~256 MB per-buffer WebGPU limit — models >500 MB crash the tab.
+  // Detect via UA (no reliable API alternative) and cap at 0.5b before any tier logic.
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
+  if (isIOS) {
+    return {
+      ok: true, gpuName: gpuName || 'Apple GPU', vramMB,
+      tier: 'mid', recommendedModel: 'qwen-0.5b',
+      tierLabel: 'Apple Silicon',
+      tierColor: '#00e5ff',
+      warning: 'iOS WebGPU has a ~256 MB buffer limit. Using the 0.5B model to stay within it — larger models crash the tab.',
+    };
+  }
+
   if (isIntegrated || vramMB < 1500) {
     tier = 'low';
     recommendedModel = 'qwen-0.5b';   // ~400 MB
@@ -101,7 +114,7 @@ const CSS = `
   :host { all: initial; font-family: ui-monospace, 'Cascadia Code', monospace; }
 
   .btn-trigger {
-    position: fixed; bottom: 24px; right: 24px; z-index: 2147483647;
+    position: fixed; bottom: 24px; left: 24px; z-index: 2147483647;
     width: 52px; height: 52px; border-radius: 50%;
     background: linear-gradient(135deg, #00e5ff1a, #8b5cf61a);
     border: 1px solid #00e5ff66;
@@ -115,7 +128,7 @@ const CSS = `
   .btn-trigger:hover { transform: scale(1.1); }
 
   .panel {
-    position: fixed; bottom: 90px; right: 24px; z-index: 2147483646;
+    position: fixed; bottom: 90px; left: 24px; z-index: 2147483646;
     width: 360px; max-width: calc(100vw - 32px);
     height: min(480px, calc(100dvh - 110px));
     background: #0a0e1a;
@@ -133,8 +146,8 @@ const CSS = `
 
   /* Mobile responsive */
   @media (max-width: 420px) {
-    .panel { width: calc(100vw - 16px); right: 8px; bottom: 80px; }
-    .btn-trigger { right: 12px; }
+    .panel { width: calc(100vw - 16px); left: 8px; bottom: 80px; }
+    .btn-trigger { left: 12px; }
   }
 
   .header {
@@ -674,8 +687,10 @@ ${ctx}`;
       for await (const delta of this.engine.generate(systemPrompt, history, text)) {
         this.patchLastMessage(delta);
       }
-    } catch {
-      this.patchLastMessage(' [error: generation failed]');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message.slice(0, 140) : String(err).slice(0, 140);
+      console.error('[llm-widget] generation error:', err);
+      this.patchLastMessage(`⚠ ${msg || 'generation failed'}`);
     } finally {
       this.generating = false;
       // Restore input bar

@@ -42,7 +42,9 @@ jobs:
       - name: Prepare demo site
         run: |
           mkdir -p _site
-          cp index.html _site/
+          # Rewrite the dev module script to point at the built IIFE bundle.
+          # The source index.html uses /src/index.ts (Vite dev only) — GH Pages needs the dist file.
+          sed 's|<script type="module" src="/src/index.ts"|<script src="dist/llm-widget.iife.js"|' index.html > _site/index.html
           cp -r dist/ _site/dist/
       - uses: actions/upload-pages-artifact@v3
         with:
