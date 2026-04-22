@@ -4,16 +4,97 @@ import { collectContext } from './indexer';
 type Status = 'idle' | 'loading' | 'ready' | 'error' | 'unsupported';
 interface Msg { role: 'user' | 'assistant'; content: string }
 
+type GPUTier = 'low' | 'mid' | 'high';
+interface GPUProbe {
+  ok: boolean;
+  reason?: string;
+  gpuName: string;
+  vramMB: number;
+  tier: GPUTier;
+  recommendedModel: string;
+  tierLabel: string;
+  tierColor: string;
+  warning?: string;
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
 }
 
-async function checkWebGPU(): Promise<{ ok: boolean; reason?: string }> {
-  const nav = navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } };
-  if (!nav.gpu) return { ok: false, reason: 'WebGPU API not available. Use Chrome 113+.' };
+// Patterns that indicate an integrated / low-VRAM GPU
+const INTEGRATED_PATTERNS = /renoir|vega\s*\d|radeon\s*graphics|uhd\s*graphics|iris|xe\s*graphics|mali|adreno|apple\s*m\d|integrated/i;
+const HIGH_END_PATTERNS = /rtx\s*[234]\d{3}|rx\s*[67][89]\d{2}|rx\s*7\d{3}|a[456789]\d{3}|m[12]\s*(ultra|max|pro)/i;
+
+async function probeGPU(): Promise<GPUProbe> {
+  type NavWithGPU = Navigator & {
+    gpu?: { requestAdapter(opts?: object): Promise<GPUAdapter | null> };
+    deviceMemory?: number;
+  };
+  const nav = navigator as NavWithGPU;
+
+  if (!nav.gpu) {
+    return { ok: false, reason: 'WebGPU API not available. Use Chrome 113+.', gpuName: 'Unknown', vramMB: 0, tier: 'low', recommendedModel: 'qwen-0.5b', tierLabel: '', tierColor: '' };
+  }
+
   const adapter = await nav.gpu.requestAdapter();
-  if (!adapter) return { ok: false, reason: 'No GPU adapter found. Enable chrome://flags/#enable-unsafe-webgpu or install Vulkan drivers.' };
-  return { ok: true };
+  if (!adapter) {
+    return { ok: false, reason: 'No GPU adapter found. Try enabling chrome://flags/#enable-unsafe-webgpu or updating GPU drivers.', gpuName: 'Unknown', vramMB: 0, tier: 'low', recommendedModel: 'qwen-0.5b', tierLabel: '', tierColor: '' };
+  }
+
+  // Get GPU name — requestAdapterInfo() is Chrome 121+
+  let gpuName = 'Unknown GPU';
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const info = await (adapter as any).requestAdapterInfo?.();
+    gpuName = info?.description || info?.device || gpuName;
+  } catch { /* not available */ }
+
+  // maxBufferSize is the best available VRAM proxy from WebGPU
+  const maxBufBytes = (adapter.limits as GPUSupportedLimits & { maxBufferSize?: number }).maxBufferSize ?? 0;
+  const maxBufMB = Math.round(maxBufBytes / (1024 * 1024));
+
+  // For integrated GPUs we can also look at system RAM
+  const systemRamGB = nav.deviceMemory ?? 4;
+  const isIntegrated = INTEGRATED_PATTERNS.test(gpuName);
+  const isHighEnd    = HIGH_END_PATTERNS.test(gpuName);
+
+  // Estimate usable VRAM
+  let vramMB: number;
+  if (isIntegrated) {
+    // Integrated GPUs share system RAM; browsers typically see 512MB–2GB
+    vramMB = Math.min(maxBufMB || 1024, Math.round(systemRamGB * 256)); // ~25% of RAM
+  } else {
+    vramMB = maxBufMB || (isHighEnd ? 6144 : 2048);
+  }
+
+  // Tier + model selection
+  let tier: GPUTier;
+  let recommendedModel: string;
+  let tierLabel: string;
+  let tierColor: string;
+  let warning: string | undefined;
+
+  if (isIntegrated || vramMB < 1500) {
+    tier = 'low';
+    recommendedModel = 'qwen-0.5b';   // ~400 MB
+    tierLabel = 'Integrated / Low VRAM';
+    tierColor = '#f59e0b';
+    warning = isIntegrated
+      ? 'Integrated GPU detected. Running the lightweight 0.5B model to stay within your shared VRAM budget.'
+      : 'Low VRAM detected. Using the 0.5B model for reliability.';
+  } else if (!isHighEnd && vramMB < 4096) {
+    tier = 'mid';
+    recommendedModel = 'qwen-1.5b';   // ~1.5 GB q4f32
+    tierLabel = 'Mid-range GPU';
+    tierColor = '#8b5cf6';
+  } else {
+    tier = 'high';
+    recommendedModel = 'qwen-1.5b';   // could serve larger models here
+    tierLabel = 'Capable GPU';
+    tierColor = '#00e5ff';
+  }
+
+  return { ok: true, gpuName, vramMB, tier, recommendedModel, tierLabel, tierColor, warning };
 }
 
 const CSS = `
@@ -166,6 +247,9 @@ export class LLMChatWidget extends HTMLElement {
   private loading = false;
   private panelVisible = false;
   private rendered = false;
+  private lastProgressAt = 0;
+  private hangTimer: ReturnType<typeof setTimeout> | null = null;
+  private gpuProbe: GPUProbe | null = null;
 
   get aiName()   { return this.getAttribute('name')  ?? 'AI Assistant'; }
   get modelKey() { return this.getAttribute('model') ?? 'qwen-1.5b'; }
@@ -222,21 +306,37 @@ export class LLMChatWidget extends HTMLElement {
 
   private renderBody(): string {
     switch (this.status) {
-      case 'idle': return `
+      case 'idle': {
+        const p = this.gpuProbe;
+        const gpuLine = p?.ok
+          ? `<span style="color:${escapeHtml(p.tierColor)};font-weight:700">${escapeHtml(p.tierLabel)}</span>
+             &nbsp;·&nbsp; <span style="color:#64748b">${escapeHtml(p.gpuName)}</span>`
+          : `<span style="color:#475569">Detecting GPU…</span>`;
+        const modelInfo = p?.ok
+          ? `Model: <strong style="color:#e2e8f0">${escapeHtml(p.recommendedModel)}</strong>`
+          : 'Model: auto-selected based on your GPU';
+        const sizeInfo = p?.recommendedModel === 'qwen-0.5b'
+          ? '~400 MB · fast on integrated GPUs'
+          : p?.recommendedModel === 'qwen-1.5b'
+          ? '~1.5 GB · best quality for mid-range+'
+          : '~400 MB · cached after first load';
+        const warningHtml = p?.warning
+          ? `<p class="hint" style="color:#f59e0b;margin-top:-4px">${escapeHtml(p.warning)}</p>`
+          : '';
+        return `
         <div class="center">
           <span class="emoji">&#129504;</span>
-          <p class="desc">
-            A language model that runs directly in your browser using your GPU.
-            <br><br>
-            <span style="color:#475569">~900 MB &middot; cached after first load &middot; no server</span>
-          </p>
+          <p class="desc" style="margin-bottom:4px">${gpuLine}</p>
+          <p class="desc" style="color:#475569;font-size:11px;margin-bottom:8px">${modelInfo} &middot; ${sizeInfo}</p>
+          ${warningHtml}
           <button class="btn-load" id="load">Load AI &rarr;</button>
-          <p class="hint">Chrome 113+ &middot; WebGPU required</p>
+          <p class="hint">Runs entirely in your browser &middot; no server &middot; cached after first load</p>
         </div>`;
+      }
 
       case 'loading': return `
         <div class="center">
-          <p style="font-size:13px;font-weight:700;color:#00e5ff">Downloading model weights</p>
+          <p id="phase-title" style="font-size:13px;font-weight:700;color:#00e5ff">Downloading model weights</p>
           <div style="width:100%">
             <div class="progress-bar-track">
               <div class="progress-bar-fill" id="bar"></div>
@@ -246,7 +346,7 @@ export class LLMChatWidget extends HTMLElement {
               <span class="progress-pct" id="prog-pct">0%</span>
             </div>
           </div>
-          <p class="hint">Cached to your browser after this</p>
+          <p id="phase-hint" class="hint">Cached to your browser after this</p>
         </div>`;
 
       case 'unsupported': return `
@@ -273,7 +373,7 @@ export class LLMChatWidget extends HTMLElement {
   }
 
   private statusLabel(): string {
-    if (this.status === 'ready')    return `${this.modelKey} · WebGPU`;
+    if (this.status === 'ready')    return `${escapeHtml(this.gpuProbe?.recommendedModel ?? this.modelKey)} · WebGPU`;
     if (this.status === 'loading')  return 'loading...';
     return 'offline';
   }
@@ -349,6 +449,15 @@ export class LLMChatWidget extends HTMLElement {
         }
         this.bindPanelEvents();
         setTimeout(() => (this.shadow.getElementById('input') as HTMLInputElement | null)?.focus(), 50);
+
+        // Probe GPU in the background when panel first opens (only once)
+        if (!this.gpuProbe && this.status === 'idle') {
+          probeGPU().then(probe => {
+            this.gpuProbe = probe;
+            // Repaint idle screen with GPU info
+            if (this.status === 'idle') this.repaintBody();
+          });
+        }
       }
     } else {
       if (this.generating) this.stopGeneration();
@@ -357,30 +466,66 @@ export class LLMChatWidget extends HTMLElement {
   }
 
   private updateProgress(pct: number, text: string) {
-    const bar    = this.shadow.getElementById('bar') as HTMLElement | null;
-    const pctEl  = this.shadow.getElementById('prog-pct');
-    const textEl = this.shadow.getElementById('prog-text');
+    this.lastProgressAt = Date.now();
+
+    // Clear any existing hang warning timer and reset it
+    if (this.hangTimer) clearTimeout(this.hangTimer);
+    this.hangTimer = setTimeout(() => this.showHangWarning(), 90_000); // 90s no progress = warn
+
+    const bar      = this.shadow.getElementById('bar') as HTMLElement | null;
+    const pctEl    = this.shadow.getElementById('prog-pct');
+    const textEl   = this.shadow.getElementById('prog-text');
+    const titleEl  = this.shadow.getElementById('phase-title');
+    const hintEl   = this.shadow.getElementById('phase-hint');
+
     if (bar)    bar.style.width = `${pct}%`;
     if (pctEl)  pctEl.textContent = `${pct}%`;
-    if (textEl) textEl.textContent = text.slice(0, 45);
+    if (textEl) textEl.textContent = text.slice(0, 48);
+
+    // Detect phase from WebLLM progress text and update title accordingly
+    if (text.includes('shader') || text.includes('Loading GPU')) {
+      const match = text.match(/\[(\d+)\/(\d+)\]/);
+      const ofTotal = match ? ` (${match[1]}/${match[2]})` : '';
+      if (titleEl) titleEl.textContent = `Compiling GPU shaders${ofTotal}`;
+      if (hintEl)  hintEl.textContent  = 'First load only — cached after this. AMD GPUs may take 3–5 min here.';
+    } else if (text.includes('Fetch') || text.includes('fetch') || text.includes('param')) {
+      if (titleEl) titleEl.textContent = 'Downloading model weights';
+      if (hintEl)  hintEl.textContent  = 'Cached to your browser after this';
+    } else if (text.includes('Init') || text.includes('init') || text.includes('Loading')) {
+      if (titleEl) titleEl.textContent = 'Initializing model';
+      if (hintEl)  hintEl.textContent  = 'Almost ready...';
+    }
+  }
+
+  private showHangWarning() {
+    const hintEl  = this.shadow.getElementById('phase-hint');
+    const titleEl = this.shadow.getElementById('phase-title');
+    if (hintEl)  hintEl.textContent  = '⚠ Taking longer than expected. Your GPU may be low on VRAM. Try closing other tabs or reloading.';
+    if (hintEl)  hintEl.style.color  = '#f87171';
+    if (titleEl) titleEl.style.color = '#f59e0b';
   }
 
   private async loadModel() {
     if (this.loading) return;
     this.loading = true;
     try {
-      const gpu = await checkWebGPU();
-      if (!gpu.ok) {
-        this.errorMsg = escapeHtml(gpu.reason ?? 'WebGPU not available.');
+      // Use cached probe result or run it now
+      const probe = this.gpuProbe ?? await probeGPU();
+      this.gpuProbe = probe;
+      if (!probe.ok) {
+        this.errorMsg = escapeHtml(probe.reason ?? 'WebGPU not available.');
         this.status = 'error';
         this.repaintBody();
         return;
       }
 
+      // Use probed recommended model; fall back to attribute override if explicitly set
+      const modelToLoad = this.getAttribute('model') ?? probe.recommendedModel;
+
       this.status = 'loading';
       this.repaintBody();
 
-      await this.engine.load(this.modelKey, (pct, text) => {
+      await this.engine.load(modelToLoad, (pct, text) => {
         this.updateProgress(pct, text);
       });
 
@@ -395,6 +540,7 @@ export class LLMChatWidget extends HTMLElement {
       this.repaintBody();
     } finally {
       this.loading = false;
+      if (this.hangTimer) { clearTimeout(this.hangTimer); this.hangTimer = null; }
     }
   }
 
