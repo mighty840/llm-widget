@@ -8,7 +8,14 @@ var e = {
 	"cpu-md": "HuggingFaceTB/SmolLM2-1.7B-Instruct",
 	"qwen-0.5b": "onnx-community/Qwen2.5-0.5B-Instruct",
 	"qwen-1.5b": "onnx-community/Qwen2.5-1.5B-Instruct"
-}, n = "https://cdn.jsdelivr.net/npm/@huggingface/transformers/dist/transformers.web.min.js", r = class {
+}, n = "https://esm.sh/@huggingface/transformers", r = null;
+async function i() {
+	return r || (r = await import(
+		/* @vite-ignore */
+		n
+)), r;
+}
+var a = class {
 	constructor() {
 		this.mlcEngine = null, this.hfPipe = null, this.device = "webgpu", this.busy = !1, this.stopRequested = !1;
 	}
@@ -34,21 +41,18 @@ var e = {
 			stream: !1
 		});
 	}
-	async _loadWASM(e, r) {
-		r(0, "Loading inference runtime from CDN…");
-		let { pipeline: i, TextStreamer: a } = await import(
-			/* @vite-ignore */
-			n
-), o = t[e] ?? t["cpu-sm"];
-		r(5, `Loading ${o}…`), this.hfPipe = await i("text-generation", o, {
+	async _loadWASM(e, n) {
+		n(0, "Loading inference runtime from CDN…");
+		let { pipeline: r } = await i(), a = t[e] ?? t["cpu-sm"];
+		n(5, `Loading ${a}…`), this.hfPipe = await r("text-generation", a, {
 			device: "wasm",
 			dtype: "q4",
 			progress_callback: (e) => {
-				let t = e.progress ?? 0, n = Math.round(t > 1 ? t : t * 100);
+				let t = e.progress ?? 0, r = Math.round(t > 1 ? t : t * 100);
 				if (e.status === "download" || e.status === "progress") {
 					let t = e.file ? e.file.split("/").pop() : "";
-					r(n, t ? `Downloading ${t}` : "Downloading…");
-				} else e.status === "loading" || e.status === "initiate" ? r(n || 5, "Loading model…") : (e.status === "ready" || e.status === "done") && r(100, "Ready");
+					n(r, t ? `Downloading ${t}` : "Downloading…");
+				} else e.status === "loading" || e.status === "initiate" ? n(r || 5, "Loading model…") : (e.status === "ready" || e.status === "done") && n(100, "Ready");
 			}
 		});
 	}
@@ -79,9 +83,9 @@ var e = {
 			t && (yield t);
 		}
 	}
-	async *_generateWASM(e, t, r) {
+	async *_generateWASM(e, t, n) {
 		if (!this.hfPipe) throw Error("Engine not loaded");
-		let i = [
+		let r = [
 			{
 				role: "system",
 				content: e
@@ -89,22 +93,19 @@ var e = {
 			...t,
 			{
 				role: "user",
-				content: r
+				content: n
 			}
 		], a = [], o = null, s = (e) => {
 			a.push(e);
 			let t = o;
 			o = null, t?.();
-		}, { TextStreamer: c } = await import(
-			/* @vite-ignore */
-			n
-), l = new c(this.hfPipe.tokenizer, {
+		}, { TextStreamer: c } = await i(), l = new c(this.hfPipe.tokenizer, {
 			skip_prompt: !0,
 			skip_special_tokens: !0,
 			callback_function: (e) => {
 				this.stopRequested || s(e);
 			}
-		}), u = this.hfPipe(i, {
+		}), u = this.hfPipe(r, {
 			max_new_tokens: 512,
 			temperature: .7,
 			do_sample: !0,
@@ -126,14 +127,14 @@ var e = {
 	destroy() {
 		this.mlcEngine?.unload(), this.mlcEngine = null, this.hfPipe?.dispose?.(), this.hfPipe = null;
 	}
-}, i = 3500, a = {
+}, o = 3500, s = {
 	explicit: 800,
 	jsonld: 1e3,
 	meta: 200,
 	microdata: 400,
 	semantic: 1200,
 	fallback: 300
-}, o = [
+}, c = [
 	"nav",
 	"header",
 	"footer",
@@ -157,7 +158,7 @@ var e = {
 	"[class*=\"social-share\"]",
 	"[class*=\"comment\"]",
 	"aside"
-].join(","), s = [
+].join(","), l = [
 	"[role=\"main\"]",
 	"main",
 	"article",
@@ -179,43 +180,43 @@ var e = {
 	".product-description",
 	"#product-detail",
 	"section[id]"
-], c = new Set(/* @__PURE__ */ "name.description.headline.articleBody.text.abstract.price.priceCurrency.lowPrice.highPrice.availability.sku.brand.question.acceptedAnswer.answer.openingHours.telephone.streetAddress.addressLocality.addressCountry.author.datePublished.dateModified.keywords.articleSection.hasMenuItem.itemOffered.servesCuisine.ratingValue.reviewCount.bestRating.softwareVersion.operatingSystem.featureList".split("."));
-function l() {
+], u = new Set(/* @__PURE__ */ "name.description.headline.articleBody.text.abstract.price.priceCurrency.lowPrice.highPrice.availability.sku.brand.question.acceptedAnswer.answer.openingHours.telephone.streetAddress.addressLocality.addressCountry.author.datePublished.dateModified.keywords.articleSection.hasMenuItem.itemOffered.servesCuisine.ratingValue.reviewCount.bestRating.softwareVersion.operatingSystem.featureList".split("."));
+function d() {
 	let e = [];
 	return document.querySelectorAll("[data-llm-context]").forEach((t) => {
 		let n = t.innerText.replace(/\s+/g, " ").trim();
 		n && e.push(n);
-	}), e.join("\n\n").slice(0, a.explicit);
+	}), e.join("\n\n").slice(0, s.explicit);
 }
-function u(e, t = 0) {
+function f(e, t = 0) {
 	if (t > 4 || typeof e != "object" || !e) return typeof e == "string" || typeof e == "number" ? String(e) : "";
-	if (Array.isArray(e)) return e.map((e) => u(e, t)).filter(Boolean).join(", ");
+	if (Array.isArray(e)) return e.map((e) => f(e, t)).filter(Boolean).join(", ");
 	let n = e;
-	return n["@graph"] ? u(n["@graph"], t) : Object.entries(n).filter(([e]) => c.has(e)).map(([e, n]) => {
-		let r = u(n, t + 1);
+	return n["@graph"] ? f(n["@graph"], t) : Object.entries(n).filter(([e]) => u.has(e)).map(([e, n]) => {
+		let r = f(n, t + 1);
 		return r ? `${e}: ${r}` : "";
 	}).filter(Boolean).join("\n");
 }
-function d() {
+function p() {
 	let e = [];
 	return document.querySelectorAll("script[type=\"application/ld+json\"]").forEach((t) => {
 		try {
-			let n = u(JSON.parse(t.textContent ?? ""));
+			let n = f(JSON.parse(t.textContent ?? ""));
 			n.length > 20 && e.push(n);
 		} catch {}
-	}), e.join("\n\n").slice(0, a.jsonld);
+	}), e.join("\n\n").slice(0, s.jsonld);
 }
-function f() {
+function m() {
 	let e = [], t = document.title.trim();
 	t && e.push(`Page: ${t}`);
 	let n = document.querySelector("meta[name=\"description\"]")?.content?.trim();
 	n && e.push(`Description: ${n}`);
-	let r = document.querySelector("meta[property=\"og:title\"]")?.content?.trim(), i = document.querySelector("meta[property=\"og:description\"]")?.content?.trim(), o = document.querySelector("meta[property=\"og:type\"]")?.content?.trim(), s = document.querySelector("meta[property=\"og:site_name\"]")?.content?.trim();
-	s && e.push(`Site: ${s}`), o && e.push(`Type: ${o}`), r && r !== t && e.push(`OG title: ${r}`), i && i !== n && e.push(`OG description: ${i}`);
+	let r = document.querySelector("meta[property=\"og:title\"]")?.content?.trim(), i = document.querySelector("meta[property=\"og:description\"]")?.content?.trim(), a = document.querySelector("meta[property=\"og:type\"]")?.content?.trim(), o = document.querySelector("meta[property=\"og:site_name\"]")?.content?.trim();
+	o && e.push(`Site: ${o}`), a && e.push(`Type: ${a}`), r && r !== t && e.push(`OG title: ${r}`), i && i !== n && e.push(`OG description: ${i}`);
 	let c = document.querySelector("meta[property=\"article:published_time\"]")?.content?.trim();
-	return c && e.push(`Published: ${c.slice(0, 10)}`), e.join("\n").slice(0, a.meta);
+	return c && e.push(`Published: ${c.slice(0, 10)}`), e.join("\n").slice(0, s.meta);
 }
-function p() {
+function h() {
 	let e = new Set([
 		"name",
 		"description",
@@ -238,9 +239,9 @@ function p() {
 		if (!a || a.length < 1) return;
 		let o = `${i}: ${a}`;
 		n.has(o) || (n.add(o), t.push(o));
-	}), t.join("\n").slice(0, a.microdata);
+	}), t.join("\n").slice(0, s.microdata);
 }
-function m(e) {
+function g(e) {
 	let t = [];
 	function n(e) {
 		if (e.nodeType === Node.TEXT_NODE) {
@@ -250,60 +251,60 @@ function m(e) {
 		}
 		if (e.nodeType !== Node.ELEMENT_NODE) return;
 		let r = e;
-		if (!r.matches?.(o) && r.getAttribute("aria-hidden") !== "true") for (let e of r.childNodes) n(e);
+		if (!r.matches?.(c) && r.getAttribute("aria-hidden") !== "true") for (let e of r.childNodes) n(e);
 	}
 	return n(e), t.join("").replace(/\s+/g, " ").trim();
 }
-function h() {
+function _() {
 	let e = /* @__PURE__ */ new Set(), t = [], n = 0;
-	for (let r of s) {
-		if (n >= a.semantic) break;
+	for (let r of l) {
+		if (n >= s.semantic) break;
 		document.querySelectorAll(r).forEach((r) => {
-			if (e.has(r) || n >= a.semantic || [...e].some((e) => e.contains(r))) return;
+			if (e.has(r) || n >= s.semantic || [...e].some((e) => e.contains(r))) return;
 			e.add(r);
-			let i = m(r).slice(0, 600);
+			let i = g(r).slice(0, 600);
 			i.length > 40 && (t.push(i), n += i.length);
 		});
 	}
-	return t.join("\n\n").slice(0, a.semantic);
-}
-function g() {
-	return m(document.body).slice(0, a.fallback);
-}
-function _() {
-	return v().context;
+	return t.join("\n\n").slice(0, s.semantic);
 }
 function v() {
+	return g(document.body).slice(0, s.fallback);
+}
+function y() {
+	return b().context;
+}
+function b() {
 	let e = [
 		{
 			name: "explicit",
-			text: l()
-		},
-		{
-			name: "jsonld",
 			text: d()
 		},
 		{
-			name: "meta",
-			text: f()
-		},
-		{
-			name: "microdata",
+			name: "jsonld",
 			text: p()
 		},
 		{
-			name: "semantic",
+			name: "meta",
+			text: m()
+		},
+		{
+			name: "microdata",
 			text: h()
+		},
+		{
+			name: "semantic",
+			text: _()
 		}
 	].filter((e) => e.text.length > 0);
 	if (e.every((e) => e.name !== "semantic" && e.name !== "explicit")) {
-		let t = g();
+		let t = v();
 		t && e.push({
 			name: "fallback",
 			text: t
 		});
 	}
-	let t = e.map((e) => e.text).join("\n\n").slice(0, i);
+	let t = e.map((e) => e.text).join("\n\n").slice(0, o);
 	return {
 		context: t,
 		sources: e.map((e) => e.name),
@@ -312,13 +313,13 @@ function v() {
 }
 //#endregion
 //#region src/widget.ts
-var y = "0.1.6", b = "bdf34a7";
-console.info(`%cIdjet v${y}${` · ${b}`} — WebGPU in-browser LLM`, "color:#00e5ff;font-weight:bold");
-function x(e) {
+var x = "0.1.6", S = "f29f13f";
+console.info(`%cIdjet v${x}${` · ${S}`} — WebGPU in-browser LLM`, "color:#00e5ff;font-weight:bold");
+function C(e) {
 	return e.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
 }
-var S = /renoir|vega\s*\d|radeon\s*graphics|uhd\s*graphics|iris|xe\s*graphics|mali|adreno|integrated/i, C = /apple\s*m\d|apple\s*gpu/i, w = /rtx\s*[234]\d{3}|rx\s*[67][89]\d{2}|rx\s*7\d{3}|a[456789]\d{3}|m[12]\s*(ultra|max|pro)/i;
-async function T() {
+var w = /renoir|vega\s*\d|radeon\s*graphics|uhd\s*graphics|iris|xe\s*graphics|mali|adreno|integrated/i, T = /apple\s*m\d|apple\s*gpu/i, E = /rtx\s*[234]\d{3}|rx\s*[67][89]\d{2}|rx\s*7\d{3}|a[456789]\d{3}|m[12]\s*(ultra|max|pro)/i;
+async function D() {
 	let e = navigator, t = (e, t) => ({
 		ok: !0,
 		device: "wasm",
@@ -338,7 +339,7 @@ async function T() {
 		let e = await n.requestAdapterInfo?.();
 		r = e?.description || e?.device || r;
 	} catch {}
-	let i = n.limits.maxBufferSize ?? 0, a = Math.round(i / (1024 * 1024)), o = e.deviceMemory ?? 4, s = S.test(r), c = C.test(r), l = w.test(r) || c, u;
+	let i = n.limits.maxBufferSize ?? 0, a = Math.round(i / (1024 * 1024)), o = e.deviceMemory ?? 4, s = w.test(r), c = T.test(r), l = E.test(r) || c, u;
 	u = s ? Math.min(a || 1024, Math.round(o * 256)) : a || (l ? 6144 : 2048);
 	let d, f, p, m, h;
 	return /iP(hone|ad|od)/.test(navigator.userAgent) ? t("iOS CPU Mode", "Using CPU inference on iOS — WebGPU buffer limits crash the tab on models >256 MB.") : (s || u < 1500 ? (d = "low", f = "qwen-0.5b", p = "Integrated / Low VRAM", m = "#f59e0b", h = s ? "Integrated GPU — using the 0.5B model to stay within shared VRAM." : "Low VRAM — using the 0.5B model for reliability.") : !l && u < 4096 ? (d = "mid", f = "qwen-1.5b", p = "Mid-range GPU", m = "#8b5cf6") : (d = "high", f = "qwen-1.5b", p = c ? "Apple Silicon" : "Capable GPU", m = "#00e5ff"), {
@@ -353,7 +354,7 @@ async function T() {
 		warning: h
 	});
 }
-var E = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', monospace; }\n\n  .btn-trigger {\n    position: fixed; bottom: 24px; left: 24px; z-index: 2147483647;\n    width: 52px; height: 52px; border-radius: 50%;\n    background: linear-gradient(135deg, #00e5ff1a, #8b5cf61a);\n    border: 1px solid #00e5ff66;\n    backdrop-filter: blur(12px);\n    cursor: pointer; font-size: 20px;\n    display: flex; align-items: center; justify-content: center;\n    transition: transform 0.2s ease;\n    box-shadow: 0 0 20px rgba(0,229,255,0.15);\n    color: #e2e8f0;\n  }\n  .btn-trigger:hover { transform: scale(1.1); }\n\n  .panel {\n    position: fixed; bottom: 90px; left: 24px; z-index: 2147483646;\n    width: 360px; max-width: calc(100vw - 32px);\n    height: min(480px, calc(100dvh - 110px));\n    background: #0a0e1a;\n    border: 1px solid #1e2d4a;\n    border-radius: 16px;\n    display: flex; flex-direction: column;\n    overflow: hidden;\n    box-shadow: 0 0 50px rgba(139,92,246,0.12);\n    animation: slideUp 0.2s ease;\n  }\n  @keyframes slideUp {\n    from { opacity: 0; transform: translateY(12px); }\n    to   { opacity: 1; transform: translateY(0); }\n  }\n\n  /* Mobile responsive */\n  @media (max-width: 420px) {\n    .panel { width: calc(100vw - 16px); left: 8px; bottom: 80px; }\n    .btn-trigger { left: 12px; }\n  }\n\n  .header {\n    display: flex; align-items: center; gap: 10px;\n    padding: 12px 16px;\n    background: linear-gradient(90deg, #00e5ff0d, #8b5cf60d);\n    border-bottom: 1px solid #1e2d4a;\n    flex-shrink: 0;\n  }\n  .dot {\n    width: 7px; height: 7px; border-radius: 50%;\n    background: #475569; flex-shrink: 0;\n    transition: background 0.3s, box-shadow 0.3s;\n  }\n  .dot.live { background: #00e5ff; box-shadow: 0 0 8px #00e5ff; }\n  .title { font-size: 12px; font-weight: 900; color: #e2e8f0; letter-spacing: 0.1em; }\n  .subtitle { font-size: 11px; color: #475569; margin-left: auto; }\n\n  .body {\n    flex: 1; overflow-y: auto; padding: 14px;\n    display: flex; flex-direction: column; gap: 10px;\n    scrollbar-width: thin; scrollbar-color: #8b5cf6 #0f1629;\n  }\n\n  .center {\n    display: flex; flex-direction: column;\n    align-items: center; justify-content: center;\n    height: 100%; gap: 16px; text-align: center; padding: 0 20px;\n  }\n  .emoji { font-size: 40px; line-height: 1; }\n  .desc { font-size: 12px; color: #64748b; line-height: 1.6; }\n  .hint { font-size: 11px; color: #334155; }\n\n  .btn-load {\n    padding: 9px 28px; border-radius: 8px;\n    background: #00e5ff; color: #050810;\n    font-size: 13px; font-weight: 700; font-family: inherit;\n    border: none; cursor: pointer;\n    transition: opacity 0.2s;\n  }\n  .btn-load:hover { opacity: 0.88; }\n\n  .progress-bar-track {\n    width: 100%; height: 5px; background: #1e2d4a;\n    border-radius: 99px; overflow: hidden;\n  }\n  .progress-bar-fill {\n    height: 100%; width: 0%;\n    background: linear-gradient(90deg, #00e5ff, #8b5cf6);\n    border-radius: 99px; transition: width 0.4s ease;\n  }\n  .progress-label {\n    display: flex; justify-content: space-between;\n    margin-top: 6px; font-size: 11px;\n  }\n  .progress-text { color: #475569; }\n  .progress-pct  { color: #00e5ff; font-weight: 700; }\n\n  .msg { display: flex; }\n  .msg.user { justify-content: flex-end; }\n  .bubble {\n    max-width: 86%; font-size: 13px; line-height: 1.5;\n    border-radius: 12px; padding: 8px 12px;\n  }\n  .bubble.user {\n    background: #00e5ff15; border: 1px solid #00e5ff33; color: #e2e8f0;\n  }\n  .bubble.assistant {\n    background: #0f1629; border: 1px solid #1e2d4a; color: #94a3b8;\n  }\n\n  /* Typing dots animation */\n  @keyframes blink { 0%,80%,100%{opacity:0} 40%{opacity:1} }\n  .typing span { display:inline-block; width:5px; height:5px; border-radius:50%; background:#64748b; animation: blink 1.4s infinite both; }\n  .typing span:nth-child(2) { animation-delay:.2s }\n  .typing span:nth-child(3) { animation-delay:.4s }\n\n  .input-bar {\n    display: flex; gap: 8px; flex-shrink: 0;\n    padding: 10px 12px; border-top: 1px solid #1e2d4a;\n  }\n  .input {\n    flex: 1; background: #0f1629; border: 1px solid #1e2d4a;\n    border-radius: 8px; color: #e2e8f0; font-size: 13px;\n    font-family: inherit; padding: 8px 12px; outline: none;\n    transition: border-color 0.2s;\n  }\n  .input:focus { border-color: #8b5cf666; }\n  .input::placeholder { color: #334155; }\n  .btn-send {\n    padding: 8px 14px; border-radius: 8px; border: none;\n    font-size: 14px; font-family: inherit; font-weight: 700;\n    cursor: pointer; transition: background 0.2s, color 0.2s;\n    background: #00e5ff; color: #050810;\n  }\n  .btn-send:disabled { background: #1e2d4a; color: #475569; cursor: default; }\n\n  /* Stop button */\n  .btn-stop { padding:8px 12px; border-radius:8px; border:1px solid #ef444455; background:#ef444411; color:#f87171; font-size:12px; font-family:inherit; cursor:pointer; }\n  .btn-stop:hover { background:#ef444422; }\n", D = class extends HTMLElement {
+var O = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', monospace; }\n\n  .btn-trigger {\n    position: fixed; bottom: 24px; left: 24px; z-index: 2147483647;\n    width: 52px; height: 52px; border-radius: 50%;\n    background: linear-gradient(135deg, #00e5ff1a, #8b5cf61a);\n    border: 1px solid #00e5ff66;\n    backdrop-filter: blur(12px);\n    cursor: pointer; font-size: 20px;\n    display: flex; align-items: center; justify-content: center;\n    transition: transform 0.2s ease;\n    box-shadow: 0 0 20px rgba(0,229,255,0.15);\n    color: #e2e8f0;\n  }\n  .btn-trigger:hover { transform: scale(1.1); }\n\n  .panel {\n    position: fixed; bottom: 90px; left: 24px; z-index: 2147483646;\n    width: 360px; max-width: calc(100vw - 32px);\n    height: min(480px, calc(100dvh - 110px));\n    background: #0a0e1a;\n    border: 1px solid #1e2d4a;\n    border-radius: 16px;\n    display: flex; flex-direction: column;\n    overflow: hidden;\n    box-shadow: 0 0 50px rgba(139,92,246,0.12);\n    animation: slideUp 0.2s ease;\n  }\n  @keyframes slideUp {\n    from { opacity: 0; transform: translateY(12px); }\n    to   { opacity: 1; transform: translateY(0); }\n  }\n\n  /* Mobile responsive */\n  @media (max-width: 420px) {\n    .panel { width: calc(100vw - 16px); left: 8px; bottom: 80px; }\n    .btn-trigger { left: 12px; }\n  }\n\n  .header {\n    display: flex; align-items: center; gap: 10px;\n    padding: 12px 16px;\n    background: linear-gradient(90deg, #00e5ff0d, #8b5cf60d);\n    border-bottom: 1px solid #1e2d4a;\n    flex-shrink: 0;\n  }\n  .dot {\n    width: 7px; height: 7px; border-radius: 50%;\n    background: #475569; flex-shrink: 0;\n    transition: background 0.3s, box-shadow 0.3s;\n  }\n  .dot.live { background: #00e5ff; box-shadow: 0 0 8px #00e5ff; }\n  .title { font-size: 12px; font-weight: 900; color: #e2e8f0; letter-spacing: 0.1em; }\n  .subtitle { font-size: 11px; color: #475569; margin-left: auto; }\n\n  .body {\n    flex: 1; overflow-y: auto; padding: 14px;\n    display: flex; flex-direction: column; gap: 10px;\n    scrollbar-width: thin; scrollbar-color: #8b5cf6 #0f1629;\n  }\n\n  .center {\n    display: flex; flex-direction: column;\n    align-items: center; justify-content: center;\n    height: 100%; gap: 16px; text-align: center; padding: 0 20px;\n  }\n  .emoji { font-size: 40px; line-height: 1; }\n  .desc { font-size: 12px; color: #64748b; line-height: 1.6; }\n  .hint { font-size: 11px; color: #334155; }\n\n  .btn-load {\n    padding: 9px 28px; border-radius: 8px;\n    background: #00e5ff; color: #050810;\n    font-size: 13px; font-weight: 700; font-family: inherit;\n    border: none; cursor: pointer;\n    transition: opacity 0.2s;\n  }\n  .btn-load:hover { opacity: 0.88; }\n\n  .progress-bar-track {\n    width: 100%; height: 5px; background: #1e2d4a;\n    border-radius: 99px; overflow: hidden;\n  }\n  .progress-bar-fill {\n    height: 100%; width: 0%;\n    background: linear-gradient(90deg, #00e5ff, #8b5cf6);\n    border-radius: 99px; transition: width 0.4s ease;\n  }\n  .progress-label {\n    display: flex; justify-content: space-between;\n    margin-top: 6px; font-size: 11px;\n  }\n  .progress-text { color: #475569; }\n  .progress-pct  { color: #00e5ff; font-weight: 700; }\n\n  .msg { display: flex; }\n  .msg.user { justify-content: flex-end; }\n  .bubble {\n    max-width: 86%; font-size: 13px; line-height: 1.5;\n    border-radius: 12px; padding: 8px 12px;\n  }\n  .bubble.user {\n    background: #00e5ff15; border: 1px solid #00e5ff33; color: #e2e8f0;\n  }\n  .bubble.assistant {\n    background: #0f1629; border: 1px solid #1e2d4a; color: #94a3b8;\n  }\n\n  /* Typing dots animation */\n  @keyframes blink { 0%,80%,100%{opacity:0} 40%{opacity:1} }\n  .typing span { display:inline-block; width:5px; height:5px; border-radius:50%; background:#64748b; animation: blink 1.4s infinite both; }\n  .typing span:nth-child(2) { animation-delay:.2s }\n  .typing span:nth-child(3) { animation-delay:.4s }\n\n  .input-bar {\n    display: flex; gap: 8px; flex-shrink: 0;\n    padding: 10px 12px; border-top: 1px solid #1e2d4a;\n  }\n  .input {\n    flex: 1; background: #0f1629; border: 1px solid #1e2d4a;\n    border-radius: 8px; color: #e2e8f0; font-size: 13px;\n    font-family: inherit; padding: 8px 12px; outline: none;\n    transition: border-color 0.2s;\n  }\n  .input:focus { border-color: #8b5cf666; }\n  .input::placeholder { color: #334155; }\n  .btn-send {\n    padding: 8px 14px; border-radius: 8px; border: none;\n    font-size: 14px; font-family: inherit; font-weight: 700;\n    cursor: pointer; transition: background 0.2s, color 0.2s;\n    background: #00e5ff; color: #050810;\n  }\n  .btn-send:disabled { background: #1e2d4a; color: #475569; cursor: default; }\n\n  /* Stop button */\n  .btn-stop { padding:8px 12px; border-radius:8px; border:1px solid #ef444455; background:#ef444411; color:#f87171; font-size:12px; font-family:inherit; cursor:pointer; }\n  .btn-stop:hover { background:#ef444422; }\n", k = class extends HTMLElement {
 	get aiName() {
 		return this.getAttribute("name") ?? "AI Assistant";
 	}
@@ -364,7 +365,7 @@ var E = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', m
 		return this.getAttribute("greeting") ?? "Hi! I'm an AI assistant running entirely in your browser. Ask me anything about this page.";
 	}
 	constructor() {
-		super(), this.engine = new r(), this.status = "idle", this.errorMsg = "", this.messages = [], this.generating = !1, this.loading = !1, this.panelVisible = !1, this.rendered = !1, this.lastProgressAt = 0, this.hangTimer = null, this.gpuProbe = null, this.context = "", this.lastIndexedUrl = "", this.onUrlChange = () => {
+		super(), this.engine = new a(), this.status = "idle", this.errorMsg = "", this.messages = [], this.generating = !1, this.loading = !1, this.panelVisible = !1, this.rendered = !1, this.lastProgressAt = 0, this.hangTimer = null, this.gpuProbe = null, this.context = "", this.lastIndexedUrl = "", this.onUrlChange = () => {
 			location.href !== this.lastIndexedUrl && this.reindex();
 		}, this.shadow = this.attachShadow({ mode: "open" });
 	}
@@ -380,11 +381,11 @@ var E = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', m
 		e && new MutationObserver(this.onUrlChange).observe(e, { childList: !0 });
 	}
 	reindex() {
-		this.context = _(), this.lastIndexedUrl = location.href;
+		this.context = y(), this.lastIndexedUrl = location.href;
 	}
 	render() {
 		this.shadow.innerHTML = `
-      <style>${E}</style>
+      <style>${O}</style>
       <button class="btn-trigger" id="trigger" aria-label="Open AI chat">◈</button>
     `, this.shadow.getElementById("trigger").addEventListener("click", () => this.togglePanel());
 	}
@@ -393,8 +394,8 @@ var E = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', m
       <div class="panel" id="panel" role="dialog" aria-label="AI Chat" aria-modal="true">
         <div class="header">
           <span class="dot ${this.status === "ready" ? "live" : ""}"></span>
-          <span class="title">${x(this.aiName.toUpperCase())}</span>
-          <span class="subtitle">${x(this.statusLabel())}</span>
+          <span class="title">${C(this.aiName.toUpperCase())}</span>
+          <span class="subtitle">${C(this.statusLabel())}</span>
         </div>
         <div class="body" id="body" aria-live="polite">${this.renderBody()}</div>
         ${this.status === "ready" ? `
@@ -412,18 +413,18 @@ var E = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', m
 				return `
         <div class="center">
           <span class="emoji">&#129504;</span>
-          <p class="desc" style="margin-bottom:4px">${e?.ok ? `<span style="color:${x(e.tierColor)};font-weight:700">${x(e.tierLabel)}</span>
-             &nbsp;·&nbsp; <span style="color:#64748b">${x(e.gpuName)}</span>` : "<span style=\"color:#475569\">Detecting GPU…</span>"}</p>
-          <p class="desc" style="color:#475569;font-size:11px;margin-bottom:8px">${e?.ok ? `Model: <strong style="color:#e2e8f0">${x(e.recommendedModel)}</strong>` : "Model: auto-selected based on your GPU"} &middot; ${(e?.recommendedModel && {
+          <p class="desc" style="margin-bottom:4px">${e?.ok ? `<span style="color:${C(e.tierColor)};font-weight:700">${C(e.tierLabel)}</span>
+             &nbsp;·&nbsp; <span style="color:#64748b">${C(e.gpuName)}</span>` : "<span style=\"color:#475569\">Detecting GPU…</span>"}</p>
+          <p class="desc" style="color:#475569;font-size:11px;margin-bottom:8px">${e?.ok ? `Model: <strong style="color:#e2e8f0">${C(e.recommendedModel)}</strong>` : "Model: auto-selected based on your GPU"} &middot; ${(e?.recommendedModel && {
 					"cpu-sm": "~200 MB · CPU/WASM · works everywhere",
 					"qwen-0.5b": "~400 MB · WebGPU · fast on integrated",
 					"qwen-1.5b": "~900 MB · WebGPU · best quality"
 				}[e.recommendedModel]) ?? "~200-900 MB · cached after first load"}</p>
-          ${e?.warning ? `<p class="hint" style="color:#f59e0b;margin-top:-4px">${x(e.warning)}</p>` : ""}
+          ${e?.warning ? `<p class="hint" style="color:#f59e0b;margin-top:-4px">${C(e.warning)}</p>` : ""}
           <button class="btn-load" id="load">Load AI &rarr;</button>
           <p class="hint">Runs entirely in your browser &middot; no server &middot; cached after first load</p>
           <p class="hint" style="margin-top:8px;color:#1e3a4a;font-size:10px;letter-spacing:0.08em">
-            IDJET v${y}${` &middot; ${b}`}
+            IDJET v${x}${` &middot; ${S}`}
           </p>
         </div>`;
 			}
@@ -432,14 +433,14 @@ var E = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', m
         <div class="center">
           <span class="emoji">&#10005;</span>
           <p class="desc" style="color:#f87171;margin-bottom:4px">Failed to load model.</p>
-          <p class="hint" style="color:#64748b;font-size:11px;line-height:1.5;margin-bottom:8px">${x(this.errorMsg)}</p>
+          <p class="hint" style="color:#64748b;font-size:11px;line-height:1.5;margin-bottom:8px">${C(this.errorMsg)}</p>
           <button class="btn-load" id="retry">Try again</button>
         </div>`;
 			case "ready": return "";
 		}
 	}
 	statusLabel() {
-		return this.status === "ready" ? `${x(this.gpuProbe?.recommendedModel ?? this.modelKey)} · WebGPU` : this.status === "loading" ? "loading..." : "offline";
+		return this.status === "ready" ? `${C(this.gpuProbe?.recommendedModel ?? this.modelKey)} · WebGPU` : this.status === "loading" ? "loading..." : "offline";
 	}
 	appendMessageToDOM(e, t) {
 		let n = this.shadow.getElementById("body");
@@ -477,7 +478,7 @@ var E = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', m
 				let e = document.createElement("div");
 				e.innerHTML = this.renderPanel();
 				let t = e.firstElementChild;
-				this.shadow.appendChild(t), this.status === "ready" && this.messages.forEach((e, t) => this.appendMessageToDOM(e, t)), this.bindPanelEvents(), setTimeout(() => this.shadow.getElementById("input")?.focus(), 50), !this.gpuProbe && this.status === "idle" && T().then((e) => {
+				this.shadow.appendChild(t), this.status === "ready" && this.messages.forEach((e, t) => this.appendMessageToDOM(e, t)), this.bindPanelEvents(), setTimeout(() => this.shadow.getElementById("input")?.focus(), 50), !this.gpuProbe && this.status === "idle" && D().then((e) => {
 					this.gpuProbe = e, this.status === "idle" && this.repaintBody();
 				});
 			}
@@ -499,7 +500,7 @@ var E = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', m
 		if (!this.loading) {
 			this.loading = !0;
 			try {
-				let e = this.gpuProbe ?? await T();
+				let e = this.gpuProbe ?? await D();
 				this.gpuProbe = e;
 				let t = this.getAttribute("model"), n = e.tier === "high" && t ? t : e.recommendedModel;
 				this.status = "loading", this.repaintBody();
@@ -511,7 +512,7 @@ var E = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', m
 			} catch (e) {
 				console.error("[llm-widget]", e);
 				let t = e instanceof Error ? e.message.slice(0, 160) : String(e).slice(0, 160);
-				this.errorMsg = x(t), this.status = "error", this.repaintBody();
+				this.errorMsg = C(t), this.status = "error", this.repaintBody();
 			} finally {
 				this.loading = !1, this.hangTimer && (clearTimeout(this.hangTimer), this.hangTimer = null);
 			}
@@ -526,8 +527,8 @@ var E = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', m
 		e && (e.innerHTML = `
       <div class="header">
         <span class="dot ${this.status === "ready" ? "live" : ""}"></span>
-        <span class="title">${x(this.aiName.toUpperCase())}</span>
-        <span class="subtitle">${x(this.statusLabel())}</span>
+        <span class="title">${C(this.aiName.toUpperCase())}</span>
+        <span class="subtitle">${C(this.statusLabel())}</span>
       </div>
       <div class="body" id="body" aria-live="polite">${this.renderBody()}</div>
       ${this.status === "ready" ? "\n      <div class=\"input-bar\">\n        <input class=\"input\" id=\"input\" placeholder=\"Ask something...\" autocomplete=\"off\" />\n        <button class=\"btn-send\" id=\"send\">&#8593;</button>\n      </div>" : ""}
@@ -542,7 +543,7 @@ var E = "\n  :host { all: initial; font-family: ui-monospace, 'Cascadia Code', m
 	async send() {
 		let e = this.shadow.getElementById("input"), t = e?.value.trim();
 		if (!t || this.generating) return;
-		let n = this.context || _();
+		let n = this.context || y();
 		e && (e.value = ""), this.generating = !0;
 		let r = this.shadow.getElementById("send");
 		r && (r.disabled = !0, r.textContent = "·");
@@ -587,12 +588,12 @@ ${n}`;
 };
 //#endregion
 //#region src/index.ts
-customElements.get("llm-chat") || customElements.define("llm-chat", D);
-function O() {
+customElements.get("llm-chat") || customElements.define("llm-chat", k);
+function A() {
 	let e = document.currentScript ?? document.querySelector("script[src*=\"llm-widget\"]");
 	if (e?.dataset.auto === "false" || document.querySelector("llm-chat")) return;
 	let t = document.createElement("llm-chat");
 	e?.dataset.name && t.setAttribute("name", e.dataset.name), e?.dataset.model && t.setAttribute("model", e.dataset.model), e?.dataset.greeting && t.setAttribute("greeting", e.dataset.greeting), document.body.appendChild(t);
 }
-document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", O) : O();
+document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", A) : A();
 //#endregion

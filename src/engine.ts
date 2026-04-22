@@ -18,9 +18,19 @@ const WASM_MODELS: Record<string, string> = {
   'qwen-1.5b':  'onnx-community/Qwen2.5-1.5B-Instruct',
 };
 
-// Stored in a variable so Vite/rolldown can't statically analyse and bundle it.
-// At runtime the browser fetches this ES module from CDN when CPU mode is needed.
-const HF_CDN = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers/dist/transformers.web.min.js';
+// esm.sh rewrites all bare specifiers (e.g. 'onnxruntime-web/webgpu') to absolute
+// CDN URLs at serve time. jsDelivr's static bundle leaves them as-is, which causes
+// "bare specifier not remapped" errors in browsers without an import map.
+// Stored in a variable so Vite can't statically analyse and bundle it.
+const HF_CDN = 'https://esm.sh/@huggingface/transformers';
+
+// Cache the loaded module so we don't fetch it twice (load + generate both need it).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _hfModule: any = null;
+async function getHF() {
+  if (!_hfModule) _hfModule = await import(/* @vite-ignore */ HF_CDN);
+  return _hfModule;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyPipeline = any;
@@ -64,9 +74,7 @@ export class InferenceEngine {
 
   private async _loadWASM(modelKey: string, onProgress: ProgressCallback) {
     onProgress(0, 'Loading inference runtime from CDN…');
-    // Dynamic CDN import — not bundled. Loads transformers.js (~16 MB, cached by browser).
-    const tfModule = await import(/* @vite-ignore */ HF_CDN);
-    const { pipeline, TextStreamer } = tfModule;
+    const { pipeline } = await getHF();
 
     const modelId = WASM_MODELS[modelKey] ?? WASM_MODELS['cpu-sm'];
     onProgress(5, `Loading ${modelId}…`);
@@ -144,8 +152,7 @@ export class InferenceEngine {
       const w = wakeup; wakeup = null; w?.();
     };
 
-    // Load TextStreamer from the same cached CDN module.
-    const { TextStreamer } = await import(/* @vite-ignore */ HF_CDN);
+    const { TextStreamer } = await getHF();
     const streamer = new TextStreamer(this.hfPipe.tokenizer, {
       skip_prompt: true,
       skip_special_tokens: true,
