@@ -1,4 +1,5 @@
 import { InferenceEngine } from './engine';
+import type { RemoteConfig } from './engine';
 import { collectContext } from './indexer';
 
 declare const __IDJET_VERSION__: string;
@@ -278,6 +279,9 @@ export class LLMChatWidget extends HTMLElement {
     return this.getAttribute('greeting') ??
       "Hi! I'm an AI assistant running entirely in your browser. Ask me anything about this page.";
   }
+  get apiUrl()   { return this.getAttribute('data-api-url')   ?? ''; }
+  get apiKey()   { return this.getAttribute('data-api-key')   ?? ''; }
+  get apiModel() { return this.getAttribute('data-api-model') ?? 'gpt-4o-mini'; }
 
   private get storageKey() { return `idjet:${location.hostname}:messages`; }
 
@@ -366,6 +370,15 @@ export class LLMChatWidget extends HTMLElement {
   private renderBody(): string {
     switch (this.status) {
       case 'idle': {
+        if (this.apiUrl) {
+          return `<div class="center">
+            <span class="emoji">&#127760;</span>
+            <p class="desc">Server-side inference &mdash; instant responses, no download</p>
+            <button class="btn-load" id="load">Connect &rarr;</button>
+            <p class="hint">Model: <strong style="color:#e2e8f0">${escapeHtml(this.apiModel)}</strong></p>
+            <p class="hint" style="margin-top:8px;color:#1e3a4a;font-size:10px;letter-spacing:0.08em">IDJET v${IDJET_VERSION}${IDJET_HASH ? ` &middot; ${IDJET_HASH}` : ''}</p>
+          </div>`;
+        }
         const p = this.gpuProbe;
         const gpuLine = p
           ? `<span style="color:${escapeHtml(p.tierColor)};font-weight:700">${escapeHtml(p.tierLabel)}</span> &nbsp;·&nbsp; <span style="color:#64748b">${escapeHtml(p.gpuName)}</span>`
@@ -416,6 +429,7 @@ export class LLMChatWidget extends HTMLElement {
   }
 
   private statusLabel(): string {
+    if (this.status === 'ready' && this.apiUrl) return `${escapeHtml(this.apiModel)} · Server`;
     const p = this.gpuProbe;
     if (this.status === 'ready')   return `${escapeHtml(p?.recommendedModel ?? this.modelKey)} · ${p?.device === 'wasm' ? 'CPU' : 'WebGPU'}`;
     if (this.status === 'loading') return 'loading...';
@@ -605,6 +619,22 @@ export class LLMChatWidget extends HTMLElement {
     if (this.loading) return;
     this.loading = true;
     try {
+      // Remote API path — no download, no GPU probe, instant ready.
+      if (this.apiUrl) {
+        const remote: RemoteConfig = {
+          apiUrl: this.apiUrl,
+          model: this.apiModel,
+          ...(this.apiKey ? { apiKey: this.apiKey } : {}),
+        };
+        await this.engine.load(this.apiModel, 'remote', () => {}, remote);
+        this.status = 'ready';
+        const saved = this.loadHistory();
+        this.messages = (saved && saved.length > 1) ? saved : [{ role: 'assistant', content: this.greeting }];
+        this.rebuildPanel();
+        this.emit('ready', { device: 'remote', model: this.apiModel });
+        return;
+      }
+
       const probe = this.gpuProbe ?? await probeGPU();
       this.gpuProbe = probe;
       const attrModel = this.getAttribute('model');

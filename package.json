@@ -1,6 +1,6 @@
 {
   "name": "idjet-widget",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Idjet — drop-in AI chat powered by WebGPU. Runs a local LLM in the visitor's browser, zero server.",
   "type": "module",
   "main": "dist/llm-widget.umd.cjs",

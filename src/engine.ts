@@ -2,6 +2,12 @@ import type { MLCEngine, InitProgressReport } from '@mlc-ai/web-llm';
 
 export type ProgressCallback = (pct: number, text: string) => void;
 
+export interface RemoteConfig {
+  apiUrl: string;
+  apiKey?: string;
+  model: string;
+}
+
 // WebGPU path — MLC-compiled, quantised for GPU.
 const WEBGPU_MODELS: Record<string, string> = {
   'qwen-1.5b':  'Qwen2.5-1.5B-Instruct-q4f32_1-MLC',
@@ -38,16 +44,25 @@ type AnyPipeline = any;
 export class InferenceEngine {
   private mlcEngine: MLCEngine | null = null;
   private hfPipe: AnyPipeline = null;
-  private device: 'webgpu' | 'wasm' = 'webgpu';
+  private device: 'webgpu' | 'wasm' | 'remote' = 'webgpu';
+  private remoteConfig: RemoteConfig | null = null;
+  private remoteAbort: AbortController | null = null;
   private busy = false;
   private stopRequested = false;
 
-  async load(modelKey: string, device: 'webgpu' | 'wasm', onProgress: ProgressCallback): Promise<void> {
+  async load(
+    modelKey: string,
+    device: 'webgpu' | 'wasm' | 'remote',
+    onProgress: ProgressCallback,
+    remote?: RemoteConfig,
+  ): Promise<void> {
     if (this.busy) throw new Error('Engine already loading');
     this.busy = true;
     this.device = device;
     try {
-      if (device === 'webgpu') {
+      if (device === 'remote') {
+        await this._loadRemote(remote!, onProgress);
+      } else if (device === 'webgpu') {
         await this._loadWebGPU(modelKey, onProgress);
       } else {
         await this._loadWASM(modelKey, onProgress);
@@ -55,6 +70,11 @@ export class InferenceEngine {
     } finally {
       this.busy = false;
     }
+  }
+
+  private async _loadRemote(config: RemoteConfig, onProgress: ProgressCallback) {
+    this.remoteConfig = config;
+    onProgress(100, 'Ready');
   }
 
   private async _loadWebGPU(modelKey: string, onProgress: ProgressCallback) {
@@ -103,10 +123,76 @@ export class InferenceEngine {
     userMessage: string,
   ): AsyncGenerator<string> {
     this.stopRequested = false;
-    if (this.device === 'webgpu') {
+    if (this.device === 'remote') {
+      yield* this._generateRemote(systemPrompt, history, userMessage);
+    } else if (this.device === 'webgpu') {
       yield* this._generateWebGPU(systemPrompt, history, userMessage);
     } else {
       yield* this._generateWASM(systemPrompt, history, userMessage);
+    }
+  }
+
+  private async *_generateRemote(
+    systemPrompt: string,
+    history: { role: 'user' | 'assistant'; content: string }[],
+    userMessage: string,
+  ): AsyncGenerator<string> {
+    const { apiUrl, apiKey, model } = this.remoteConfig!;
+    this.remoteAbort = new AbortController();
+
+    const response = await fetch(`${apiUrl.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}),
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...history,
+          { role: 'user', content: userMessage },
+        ],
+        stream: true,
+        max_tokens: 1024,
+        temperature: 0.7,
+      }),
+      signal: this.remoteAbort.signal,
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => response.statusText);
+      throw new Error(`Remote API ${response.status}: ${body.slice(0, 120)}`);
+    }
+
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      for (;;) {
+        if (this.stopRequested) break;
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop()!; // keep incomplete line
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed === 'data: [DONE]') continue;
+          if (!trimmed.startsWith('data: ')) continue;
+          try {
+            const json = JSON.parse(trimmed.slice(6));
+            const delta = json.choices?.[0]?.delta?.content;
+            if (delta) yield delta;
+          } catch { /* malformed SSE chunk */ }
+        }
+      }
+    } finally {
+      reader.cancel().catch(() => {});
+      this.remoteAbort = null;
     }
   }
 
@@ -177,9 +263,13 @@ export class InferenceEngine {
   interrupt(): void {
     this.stopRequested = true;
     this.mlcEngine?.interruptGenerate();
+    this.remoteAbort?.abort();
   }
 
   destroy(): void {
+    this.remoteAbort?.abort();
+    this.remoteAbort = null;
+    this.remoteConfig = null;
     this.mlcEngine?.unload();
     this.mlcEngine = null;
     this.hfPipe?.dispose?.();

@@ -17,16 +17,19 @@ async function i() {
 }
 var a = class {
 	constructor() {
-		this.mlcEngine = null, this.hfPipe = null, this.device = "webgpu", this.busy = !1, this.stopRequested = !1;
+		this.mlcEngine = null, this.hfPipe = null, this.device = "webgpu", this.remoteConfig = null, this.remoteAbort = null, this.busy = !1, this.stopRequested = !1;
 	}
-	async load(e, t, n) {
+	async load(e, t, n, r) {
 		if (this.busy) throw Error("Engine already loading");
 		this.busy = !0, this.device = t;
 		try {
-			t === "webgpu" ? await this._loadWebGPU(e, n) : await this._loadWASM(e, n);
+			t === "remote" ? await this._loadRemote(r, n) : t === "webgpu" ? await this._loadWebGPU(e, n) : await this._loadWASM(e, n);
 		} finally {
 			this.busy = !1;
 		}
+	}
+	async _loadRemote(e, t) {
+		this.remoteConfig = e, t(100, "Ready");
 	}
 	async _loadWebGPU(t, n) {
 		let r = e[t] ?? e["qwen-0.5b"], { CreateMLCEngine: i } = await import("./lib-CDS2ucrV.js");
@@ -57,7 +60,59 @@ var a = class {
 		});
 	}
 	async *generate(e, t, n) {
-		this.stopRequested = !1, this.device === "webgpu" ? yield* this._generateWebGPU(e, t, n) : yield* this._generateWASM(e, t, n);
+		this.stopRequested = !1, this.device === "remote" ? yield* this._generateRemote(e, t, n) : this.device === "webgpu" ? yield* this._generateWebGPU(e, t, n) : yield* this._generateWASM(e, t, n);
+	}
+	async *_generateRemote(e, t, n) {
+		let { apiUrl: r, apiKey: i, model: a } = this.remoteConfig;
+		this.remoteAbort = new AbortController();
+		let o = await fetch(`${r.replace(/\/$/, "")}/chat/completions`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				...i ? { Authorization: `Bearer ${i}` } : {}
+			},
+			body: JSON.stringify({
+				model: a,
+				messages: [
+					{
+						role: "system",
+						content: e
+					},
+					...t,
+					{
+						role: "user",
+						content: n
+					}
+				],
+				stream: !0,
+				max_tokens: 1024,
+				temperature: .7
+			}),
+			signal: this.remoteAbort.signal
+		});
+		if (!o.ok) {
+			let e = await o.text().catch(() => o.statusText);
+			throw Error(`Remote API ${o.status}: ${e.slice(0, 120)}`);
+		}
+		let s = o.body.getReader(), c = new TextDecoder(), l = "";
+		try {
+			for (; !this.stopRequested;) {
+				let { done: e, value: t } = await s.read();
+				if (e) break;
+				l += c.decode(t, { stream: !0 });
+				let n = l.split("\n");
+				l = n.pop();
+				for (let e of n) {
+					let t = e.trim();
+					if (!(!t || t === "data: [DONE]") && t.startsWith("data: ")) try {
+						let e = JSON.parse(t.slice(6)).choices?.[0]?.delta?.content;
+						e && (yield e);
+					} catch {}
+				}
+			}
+		} finally {
+			s.cancel().catch(() => {}), this.remoteAbort = null;
+		}
 	}
 	async *_generateWebGPU(e, t, n) {
 		if (!this.mlcEngine) throw Error("Engine not loaded");
@@ -122,10 +177,10 @@ var a = class {
 		await u;
 	}
 	interrupt() {
-		this.stopRequested = !0, this.mlcEngine?.interruptGenerate();
+		this.stopRequested = !0, this.mlcEngine?.interruptGenerate(), this.remoteAbort?.abort();
 	}
 	destroy() {
-		this.mlcEngine?.unload(), this.mlcEngine = null, this.hfPipe?.dispose?.(), this.hfPipe = null;
+		this.remoteAbort?.abort(), this.remoteAbort = null, this.remoteConfig = null, this.mlcEngine?.unload(), this.mlcEngine = null, this.hfPipe?.dispose?.(), this.hfPipe = null;
 	}
 }, o = 3500, s = {
 	explicit: 800,
@@ -313,7 +368,7 @@ function b() {
 }
 //#endregion
 //#region src/widget.ts
-var x = "0.2.4", S = "8e5c265";
+var x = "0.2.5", S = "7a34019";
 console.info(`%cIdjet v${x}${` · ${S}`} — in-browser LLM`, "color:#00e5ff;font-weight:bold");
 function C(e) {
 	return e.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
@@ -529,6 +584,15 @@ var A = class extends HTMLElement {
 	get greeting() {
 		return this.getAttribute("greeting") ?? "Hi! I'm an AI assistant running entirely in your browser. Ask me anything about this page.";
 	}
+	get apiUrl() {
+		return this.getAttribute("data-api-url") ?? "";
+	}
+	get apiKey() {
+		return this.getAttribute("data-api-key") ?? "";
+	}
+	get apiModel() {
+		return this.getAttribute("data-api-model") ?? "gpt-4o-mini";
+	}
 	get storageKey() {
 		return `idjet:${location.hostname}:messages`;
 	}
@@ -600,6 +664,13 @@ var A = class extends HTMLElement {
 	renderBody() {
 		switch (this.status) {
 			case "idle": {
+				if (this.apiUrl) return `<div class="center">
+            <span class="emoji">&#127760;</span>
+            <p class="desc">Server-side inference &mdash; instant responses, no download</p>
+            <button class="btn-load" id="load">Connect &rarr;</button>
+            <p class="hint">Model: <strong style="color:#e2e8f0">${C(this.apiModel)}</strong></p>
+            <p class="hint" style="margin-top:8px;color:#1e3a4a;font-size:10px;letter-spacing:0.08em">IDJET v${x}${` &middot; ${S}`}</p>
+          </div>`;
 				let e = this.gpuProbe;
 				return `<div class="center">
           <span class="emoji">&#129504;</span>
@@ -627,6 +698,7 @@ var A = class extends HTMLElement {
 		}
 	}
 	statusLabel() {
+		if (this.status === "ready" && this.apiUrl) return `${C(this.apiModel)} · Server`;
 		let e = this.gpuProbe;
 		return this.status === "ready" ? `${C(e?.recommendedModel ?? this.modelKey)} · ${e?.device === "wasm" ? "CPU" : "WebGPU"}` : this.status === "loading" ? "loading..." : "offline";
 	}
@@ -725,6 +797,23 @@ var A = class extends HTMLElement {
 		if (!this.loading) {
 			this.loading = !0;
 			try {
+				if (this.apiUrl) {
+					let e = {
+						apiUrl: this.apiUrl,
+						model: this.apiModel,
+						...this.apiKey ? { apiKey: this.apiKey } : {}
+					};
+					await this.engine.load(this.apiModel, "remote", () => {}, e), this.status = "ready";
+					let t = this.loadHistory();
+					this.messages = t && t.length > 1 ? t : [{
+						role: "assistant",
+						content: this.greeting
+					}], this.rebuildPanel(), this.emit("ready", {
+						device: "remote",
+						model: this.apiModel
+					});
+					return;
+				}
 				let e = this.gpuProbe ?? await O();
 				this.gpuProbe = e;
 				let t = this.getAttribute("model"), n = e.tier === "high" && t ? t : e.recommendedModel;
