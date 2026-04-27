@@ -2,15 +2,15 @@
 // Layer order: explicit opt-in > JSON-LD > meta/title > microdata > semantic HTML > fallback
 // Each layer has a char budget so no single source monopolises the context window.
 
-const TOTAL_BUDGET = 3500;
+const TOTAL_BUDGET = 6000;
 
 const BUDGETS = {
-  explicit:  800,   // [data-llm-context] — site author knows best
-  jsonld:   1000,   // <script type="application/ld+json"> — richest for e-commerce, local biz
-  meta:      200,   // <title> + <meta description> + OG — always include, small
-  microdata: 400,   // [itemprop] inline attributes — product name/price/availability
-  semantic: 1200,   // main/article/section with noise stripped
-  fallback:  300,   // body text, last resort
+  explicit:  1000,  // [data-llm-context] — site author knows best
+  jsonld:    1000,  // <script type="application/ld+json"> — richest for e-commerce, local biz
+  meta:       200,  // <title> + <meta description> + OG — always include, small
+  microdata:  400,  // [itemprop] inline attributes — product name/price/availability
+  semantic:  4000,  // main/article/section with noise stripped
+  fallback:   400,  // body text, last resort
 };
 
 // Elements to strip from semantic content before extracting text
@@ -34,8 +34,8 @@ const SEMANTIC_SELECTORS = [
   '#content', '#main', '#page-content',
   // SaaS / landing pages
   '#features', '#pricing', '#about', '#hero', '#product',
-  // Docs + support
-  '.content', '.article-body', '.markdown-body', '.prose',
+  // Docs + support (VitePress .vp-doc before generic .content)
+  '.vp-doc', '.content', '.article-body', '.markdown-body', '.prose',
   '.documentation', '.docs-content',
   // E-commerce product pages
   '.product-details', '.product-description', '#product-detail',
@@ -182,7 +182,7 @@ function extractSemantic(): string {
       // Skip if this element is a descendant of one already captured
       if ([...seen].some(s => s.contains(el))) return;
       seen.add(el);
-      const text = cleanText(el).slice(0, 600);
+      const text = cleanText(el);
       if (text.length > 40) {
         parts.push(text);
         used += text.length;

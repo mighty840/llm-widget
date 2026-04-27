@@ -182,13 +182,13 @@ var a = class {
 	destroy() {
 		this.remoteAbort?.abort(), this.remoteAbort = null, this.remoteConfig = null, this.mlcEngine?.unload(), this.mlcEngine = null, this.hfPipe?.dispose?.(), this.hfPipe = null;
 	}
-}, o = 3500, s = {
-	explicit: 800,
+}, o = 6e3, s = {
+	explicit: 1e3,
 	jsonld: 1e3,
 	meta: 200,
 	microdata: 400,
-	semantic: 1200,
-	fallback: 300
+	semantic: 4e3,
+	fallback: 400
 }, c = [
 	"nav",
 	"header",
@@ -225,6 +225,7 @@ var a = class {
 	"#about",
 	"#hero",
 	"#product",
+	".vp-doc",
 	".content",
 	".article-body",
 	".markdown-body",
@@ -317,7 +318,7 @@ function _() {
 		document.querySelectorAll(r).forEach((r) => {
 			if (e.has(r) || n >= s.semantic || [...e].some((e) => e.contains(r))) return;
 			e.add(r);
-			let i = g(r).slice(0, 600);
+			let i = g(r);
 			i.length > 40 && (t.push(i), n += i.length);
 		});
 	}
@@ -368,7 +369,7 @@ function b() {
 }
 //#endregion
 //#region src/widget.ts
-var x = "0.2.5", S = "7a34019";
+var x = "0.2.6", S = "a7a6c9d";
 console.info(`%cIdjet v${x}${` · ${S}`} — in-browser LLM`, "color:#00e5ff;font-weight:bold");
 function C(e) {
 	return e.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
