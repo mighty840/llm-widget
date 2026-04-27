@@ -742,11 +742,17 @@ export class LLMChatWidget extends HTMLElement {
     }
     if (input) input.disabled = true;
 
-    const history = this.messages.slice(1);
+    // Keep only the last 6 turns (3 exchanges) — small models hallucinate when
+    // stale history crowds out fresh page context in a limited context window.
+    const history = this.messages.slice(1).slice(-6);
     this.messages.push({ role: 'user', content: text });
     this.appendMessageToDOM(this.messages[this.messages.length - 1], this.messages.length - 1);
     this.messages.push({ role: 'assistant', content: '' });
     this.appendMessageToDOM(this.messages[this.messages.length - 1], this.messages.length - 1);
+
+    // Yield one frame so the browser paints the typing indicator before the GPU prefill
+    // locks the main thread on the first inference call.
+    await new Promise<void>(r => setTimeout(r, 0));
 
     // For CPU/small models, inject context directly into the user message — small models
     // often ignore system prompts and hallucinate without explicit in-message grounding.

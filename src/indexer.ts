@@ -8,6 +8,7 @@ const BUDGETS = {
   explicit:  1000,  // [data-llm-context] — site author knows best
   jsonld:    1000,  // <script type="application/ld+json"> — richest for e-commerce, local biz
   meta:       200,  // <title> + <meta description> + OG — always include, small
+  links:      300,  // social/contact links — extracted before noise stripping
   microdata:  400,  // [itemprop] inline attributes — product name/price/availability
   semantic:  4000,  // main/article/section with noise stripped
   fallback:   400,  // body text, last resort
@@ -26,21 +27,28 @@ const NOISE_SELECTOR = [
   'aside',
 ].join(',');
 
-// Semantic section selectors — checked in priority order
+// Semantic section selectors — specific content containers first, broad wrappers last.
+// Combined with bidirectional dedup below, once a specific element is captured its
+// ancestor containers are automatically skipped (no double-counting).
 const SEMANTIC_SELECTORS = [
-  '[role="main"]',
-  'main',
+  // Specific article/doc content (wins over any ancestor)
+  '.vp-doc',                              // VitePress article
+  '.markdown-body',                       // GitHub-rendered markdown
+  '.article-body', '.article-content',
+  '.prose',                               // Tailwind typography
+  '.docs-content', '.documentation',
+  // Semantic article element
   'article',
-  '#content', '#main', '#page-content',
-  // SaaS / landing pages
+  // Named content areas
+  '.content', '#content', '#page-content',
+  // SaaS / landing pages — captured as individual sections
   '#features', '#pricing', '#about', '#hero', '#product',
-  // Docs + support (VitePress .vp-doc before generic .content)
-  '.vp-doc', '.content', '.article-body', '.markdown-body', '.prose',
-  '.documentation', '.docs-content',
-  // E-commerce product pages
+  // E-commerce
   '.product-details', '.product-description', '#product-detail',
-  // Generic sections with meaningful IDs
+  // Generic named sections (captured individually before the page container swallows them)
   'section[id]',
+  // Large containers — only reached if nothing specific above matched
+  '[role="main"]', '#main', 'main',
 ];
 
 // JSON-LD keys worth extracting (keeps output focused, avoids schema noise)
@@ -122,6 +130,37 @@ function extractMeta(): string {
   return parts.join('\n').slice(0, BUDGETS.meta);
 }
 
+const SOCIAL_DOMAINS = [
+  'github.com', 'gitlab.com',
+  'twitter.com', 'x.com',
+  'linkedin.com',
+  'instagram.com',
+  'youtube.com', 'youtu.be',
+  'bsky.app',
+  'npmjs.com',
+  'pypi.org',
+];
+
+// Extract social/contact hrefs from the entire document before noise stripping.
+// Headers, footers, and navbars are stripped by cleanText() but typically hold the
+// only place a site lists its GitHub/Twitter/LinkedIn URLs.
+function extractLinks(): string {
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  document.querySelectorAll<HTMLAnchorElement>('a[href]').forEach(a => {
+    try {
+      const url = new URL(a.href);
+      if (!SOCIAL_DOMAINS.some(d => url.hostname === d || url.hostname.endsWith(`.${d}`))) return;
+      const href = a.href.replace(/\/$/, '');
+      if (seen.has(href)) return;
+      seen.add(href);
+      const label = a.textContent?.replace(/\s+/g, ' ').trim() || a.getAttribute('aria-label') || '';
+      parts.push(label ? `${label}: ${href}` : href);
+    } catch { /* malformed href */ }
+  });
+  return parts.join('\n').slice(0, BUDGETS.links);
+}
+
 function extractMicrodata(): string {
   // itemprop attributes — inline structured data (Microdata spec)
   // Especially useful for e-commerce product pages and local business info
@@ -179,8 +218,9 @@ function extractSemantic(): string {
     if (used >= BUDGETS.semantic) break;
     document.querySelectorAll<HTMLElement>(sel).forEach(el => {
       if (seen.has(el) || used >= BUDGETS.semantic) return;
-      // Skip if this element is a descendant of one already captured
-      if ([...seen].some(s => s.contains(el))) return;
+      // Skip if this element is a descendant of something already captured,
+      // or if it's an ancestor of something already captured (bidirectional).
+      if ([...seen].some(s => s.contains(el) || el.contains(s))) return;
       seen.add(el);
       const text = cleanText(el);
       if (text.length > 40) {
@@ -214,6 +254,7 @@ export function indexPage(): IndexResult {
     { name: 'explicit',  text: extractExplicit()  },
     { name: 'jsonld',    text: extractJsonLd()    },
     { name: 'meta',      text: extractMeta()      },
+    { name: 'links',     text: extractLinks()     },
     { name: 'microdata', text: extractMicrodata() },
     { name: 'semantic',  text: extractSemantic()  },
   ];
