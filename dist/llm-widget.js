@@ -182,15 +182,7 @@ var a = class {
 	destroy() {
 		this.remoteAbort?.abort(), this.remoteAbort = null, this.remoteConfig = null, this.mlcEngine?.unload(), this.mlcEngine = null, this.hfPipe?.dispose?.(), this.hfPipe = null;
 	}
-}, o = 6e3, s = {
-	explicit: 1e3,
-	jsonld: 1e3,
-	meta: 200,
-	links: 300,
-	microdata: 400,
-	semantic: 4e3,
-	fallback: 400
-}, c = [
+}, o = 2e3, s = 8e3, c = o + s, l = [
 	"nav",
 	"header",
 	"footer",
@@ -214,7 +206,7 @@ var a = class {
 	"[class*=\"social-share\"]",
 	"[class*=\"comment\"]",
 	"aside"
-].join(","), l = [
+].join(","), u = [
 	".vp-doc",
 	".markdown-body",
 	".article-body",
@@ -238,43 +230,7 @@ var a = class {
 	"[role=\"main\"]",
 	"#main",
 	"main"
-], u = new Set(/* @__PURE__ */ "name.description.headline.articleBody.text.abstract.price.priceCurrency.lowPrice.highPrice.availability.sku.brand.question.acceptedAnswer.answer.openingHours.telephone.streetAddress.addressLocality.addressCountry.author.datePublished.dateModified.keywords.articleSection.hasMenuItem.itemOffered.servesCuisine.ratingValue.reviewCount.bestRating.softwareVersion.operatingSystem.featureList".split("."));
-function d() {
-	let e = [];
-	return document.querySelectorAll("[data-llm-context]").forEach((t) => {
-		let n = t.innerText.replace(/\s+/g, " ").trim();
-		n && e.push(n);
-	}), e.join("\n\n").slice(0, s.explicit);
-}
-function f(e, t = 0) {
-	if (t > 4 || typeof e != "object" || !e) return typeof e == "string" || typeof e == "number" ? String(e) : "";
-	if (Array.isArray(e)) return e.map((e) => f(e, t)).filter(Boolean).join(", ");
-	let n = e;
-	return n["@graph"] ? f(n["@graph"], t) : Object.entries(n).filter(([e]) => u.has(e)).map(([e, n]) => {
-		let r = f(n, t + 1);
-		return r ? `${e}: ${r}` : "";
-	}).filter(Boolean).join("\n");
-}
-function p() {
-	let e = [];
-	return document.querySelectorAll("script[type=\"application/ld+json\"]").forEach((t) => {
-		try {
-			let n = f(JSON.parse(t.textContent ?? ""));
-			n.length > 20 && e.push(n);
-		} catch {}
-	}), e.join("\n\n").slice(0, s.jsonld);
-}
-function m() {
-	let e = [], t = document.title.trim();
-	t && e.push(`Page: ${t}`);
-	let n = document.querySelector("meta[name=\"description\"]")?.content?.trim();
-	n && e.push(`Description: ${n}`);
-	let r = document.querySelector("meta[property=\"og:title\"]")?.content?.trim(), i = document.querySelector("meta[property=\"og:description\"]")?.content?.trim(), a = document.querySelector("meta[property=\"og:type\"]")?.content?.trim(), o = document.querySelector("meta[property=\"og:site_name\"]")?.content?.trim();
-	o && e.push(`Site: ${o}`), a && e.push(`Type: ${a}`), r && r !== t && e.push(`OG title: ${r}`), i && i !== n && e.push(`OG description: ${i}`);
-	let c = document.querySelector("meta[property=\"article:published_time\"]")?.content?.trim();
-	return c && e.push(`Published: ${c.slice(0, 10)}`), e.join("\n").slice(0, s.meta);
-}
-var h = [
+], d = new Set(/* @__PURE__ */ "name.description.headline.articleBody.text.abstract.price.priceCurrency.lowPrice.highPrice.availability.sku.brand.question.acceptedAnswer.answer.openingHours.telephone.streetAddress.addressLocality.addressCountry.author.datePublished.dateModified.keywords.articleSection.hasMenuItem.itemOffered.servesCuisine.ratingValue.reviewCount.bestRating.softwareVersion.operatingSystem.featureList".split(".")), f = [
 	"github.com",
 	"gitlab.com",
 	"twitter.com",
@@ -286,22 +242,57 @@ var h = [
 	"bsky.app",
 	"npmjs.com",
 	"pypi.org"
-];
+], p = new Set(/* @__PURE__ */ "the.and.for.are.but.not.you.all.can.was.had.has.its.with.this.that.from.they.will.have.been.were.their.what.when.who.how.which.also.more.into.than.then.our.out.use.used.each.one.two.about".split("."));
+function m() {
+	let e = [];
+	return document.querySelectorAll("[data-llm-context]").forEach((t) => {
+		let n = t.innerText.replace(/\s+/g, " ").trim();
+		n && e.push(n);
+	}), e.join("\n\n").slice(0, 1e3);
+}
+function h(e, t = 0) {
+	if (t > 4 || typeof e != "object" || !e) return typeof e == "string" || typeof e == "number" ? String(e) : "";
+	if (Array.isArray(e)) return e.map((e) => h(e, t)).filter(Boolean).join(", ");
+	let n = e;
+	return n["@graph"] ? h(n["@graph"], t) : Object.entries(n).filter(([e]) => d.has(e)).map(([e, n]) => {
+		let r = h(n, t + 1);
+		return r ? `${e}: ${r}` : "";
+	}).filter(Boolean).join("\n");
+}
 function g() {
+	let e = [];
+	return document.querySelectorAll("script[type=\"application/ld+json\"]").forEach((t) => {
+		try {
+			let n = h(JSON.parse(t.textContent ?? ""));
+			n.length > 20 && e.push(n);
+		} catch {}
+	}), e.join("\n\n").slice(0, 1e3);
+}
+function _() {
+	let e = [], t = document.title.trim();
+	t && e.push(`Page: ${t}`);
+	let n = document.querySelector("meta[name=\"description\"]")?.content?.trim();
+	n && e.push(`Description: ${n}`);
+	let r = document.querySelector("meta[property=\"og:title\"]")?.content?.trim(), i = document.querySelector("meta[property=\"og:description\"]")?.content?.trim(), a = document.querySelector("meta[property=\"og:type\"]")?.content?.trim(), o = document.querySelector("meta[property=\"og:site_name\"]")?.content?.trim();
+	o && e.push(`Site: ${o}`), a && e.push(`Type: ${a}`), r && r !== t && e.push(`OG title: ${r}`), i && i !== n && e.push(`OG description: ${i}`);
+	let s = document.querySelector("meta[property=\"article:published_time\"]")?.content?.trim();
+	return s && e.push(`Published: ${s.slice(0, 10)}`), e.join("\n").slice(0, 200);
+}
+function v() {
 	let e = /* @__PURE__ */ new Set(), t = [];
 	return document.querySelectorAll("a[href]").forEach((n) => {
 		try {
 			let r = new URL(n.href);
-			if (!h.some((e) => r.hostname === e || r.hostname.endsWith(`.${e}`))) return;
+			if (!f.some((e) => r.hostname === e || r.hostname.endsWith(`.${e}`))) return;
 			let i = n.href.replace(/\/$/, "");
 			if (e.has(i)) return;
 			e.add(i);
 			let a = n.textContent?.replace(/\s+/g, " ").trim() || n.getAttribute("aria-label") || "";
 			t.push(a ? `${a}: ${i}` : i);
 		} catch {}
-	}), t.join("\n").slice(0, s.links);
+	}), t.join("\n").slice(0, 300);
 }
-function _() {
+function y() {
 	let e = new Set([
 		"name",
 		"description",
@@ -321,12 +312,21 @@ function _() {
 		let i = r.getAttribute("itemprop") ?? "";
 		if (!e.has(i)) return;
 		let a = (r.getAttribute("content") || r.getAttribute("datetime") || r.innerText).replace(/\s+/g, " ").trim();
-		if (!a || a.length < 1) return;
+		if (!a) return;
 		let o = `${i}: ${a}`;
 		n.has(o) || (n.add(o), t.push(o));
-	}), t.join("\n").slice(0, s.microdata);
+	}), t.join("\n").slice(0, 400);
 }
-function v(e) {
+function b() {
+	return [
+		m(),
+		g(),
+		_(),
+		v(),
+		y()
+	].filter(Boolean).join("\n\n").slice(0, o);
+}
+function x(e) {
 	let t = [];
 	function n(e) {
 		if (e.nodeType === Node.TEXT_NODE) {
@@ -336,83 +336,142 @@ function v(e) {
 		}
 		if (e.nodeType !== Node.ELEMENT_NODE) return;
 		let r = e;
-		if (!r.matches?.(c) && r.getAttribute("aria-hidden") !== "true") for (let e of r.childNodes) n(e);
+		if (!r.matches?.(l) && r.getAttribute("aria-hidden") !== "true") for (let e of r.childNodes) n(e);
 	}
 	return n(e), t.join("").replace(/\s+/g, " ").trim();
 }
-function y() {
+function S() {
+	for (let e of u) {
+		let t = document.querySelector(e);
+		if (t) return t;
+	}
+	return document.body;
+}
+function C() {
 	let e = /* @__PURE__ */ new Set(), t = [], n = 0;
-	for (let r of l) {
-		if (n >= s.semantic) break;
+	for (let r of u) {
+		if (n >= s) break;
 		document.querySelectorAll(r).forEach((r) => {
-			if (e.has(r) || n >= s.semantic || [...e].some((e) => e.contains(r) || r.contains(e))) return;
+			if (e.has(r) || n >= s || [...e].some((e) => e.contains(r) || r.contains(e))) return;
 			e.add(r);
-			let i = v(r);
+			let i = x(r);
 			i.length > 40 && (t.push(i), n += i.length);
 		});
 	}
-	return t.join("\n\n").slice(0, s.semantic);
+	return t.length === 0 ? x(document.body).slice(0, s) : t.join("\n\n").slice(0, s);
 }
-function b() {
-	return v(document.body).slice(0, s.fallback);
+function w(e) {
+	return e.toLowerCase().replace(/[^\w\s]/g, " ").split(/\s+/).filter((e) => e.length > 2 && !p.has(e));
 }
-function x() {
-	return S().context;
+function T(e, t) {
+	let n = (e ? `${e}\n${t}` : t).trim();
+	return n.length < 40 ? null : {
+		heading: e,
+		text: n,
+		tokens: w(n)
+	};
 }
-function S() {
-	let e = [
-		{
-			name: "explicit",
-			text: d()
-		},
-		{
-			name: "jsonld",
-			text: p()
-		},
-		{
-			name: "meta",
-			text: m()
-		},
-		{
-			name: "links",
-			text: g()
-		},
-		{
-			name: "microdata",
-			text: _()
-		},
-		{
-			name: "semantic",
-			text: y()
-		}
-	].filter((e) => e.text.length > 0);
-	if (e.every((e) => e.name !== "semantic" && e.name !== "explicit")) {
-		let t = b();
-		t && e.push({
-			name: "fallback",
-			text: t
-		});
+function E() {
+	let e = S(), t = [], n = document.title.trim(), r = [];
+	function i() {
+		let e = r.join(" ").replace(/\s+/g, " ").trim();
+		r.length = 0;
+		let i = T(n, e);
+		i && t.push(i);
 	}
-	let t = e.map((e) => e.text).join("\n\n").slice(0, o);
-	return {
-		context: t,
-		sources: e.map((e) => e.name),
-		chars: t.length
+	function a(e) {
+		if (e.nodeType === Node.TEXT_NODE) {
+			let t = (e.textContent ?? "").replace(/\s+/g, " ").trim();
+			t && r.push(t);
+			return;
+		}
+		if (e.nodeType !== Node.ELEMENT_NODE) return;
+		let t = e;
+		if (t.matches?.(l) || t.getAttribute("aria-hidden") === "true") return;
+		let o = t.tagName.toLowerCase();
+		if (/^h[1-3]$/.test(o)) {
+			i(), n = t.textContent?.replace(/\s+/g, " ").trim() ?? "";
+			return;
+		}
+		for (let e of t.childNodes) a(e);
+	}
+	return a(e), i(), t.length <= 1 ? D(x(e)) : t;
+}
+function D(e, t = 600, n = 100) {
+	let r = [], i = 0;
+	for (; i < e.length;) {
+		let a = Math.min(i + t, e.length), o = a;
+		if (a < e.length) {
+			let t = e.lastIndexOf(" ", a);
+			t > i && (o = t);
+		}
+		let s = T("", e.slice(i, o).trim());
+		if (s && r.push(s), i = o - n, i < 0 && (i = 0), i >= e.length || o === e.length) break;
+	}
+	return r;
+}
+function O(e, t, n) {
+	if (t.length === 0) return "";
+	let r = w(e);
+	if (r.length === 0) {
+		let e = "";
+		for (let r of t) {
+			if (e.length + r.text.length + 2 > n) break;
+			e += (e ? "\n\n" : "") + r.text;
+		}
+		return e;
+	}
+	let i = t.length, a = /* @__PURE__ */ new Map();
+	for (let e of t) new Set(e.tokens).forEach((e) => a.set(e, (a.get(e) ?? 0) + 1));
+	let o = /* @__PURE__ */ new Map();
+	a.forEach((e, t) => o.set(t, Math.log((i - e + .5) / (e + .5) + 1)));
+	let s = t.reduce((e, t) => e + t.tokens.length, 0) / i, c = 1.5, l = .75, u = t.map((e) => {
+		let t = /* @__PURE__ */ new Map();
+		e.tokens.forEach((e) => t.set(e, (t.get(e) ?? 0) + 1));
+		let n = e.tokens.length, i = 0;
+		for (let e of r) {
+			let r = t.get(e) ?? 0;
+			r !== 0 && (i += (o.get(e) ?? 0) * (r * (c + 1)) / (r + c * (1 - l + l * n / s)));
+		}
+		return {
+			chunk: e,
+			score: i
+		};
+	});
+	u.sort((e, t) => t.score - e.score);
+	let d = "";
+	for (let { chunk: e, score: t } of u) {
+		if (t === 0) break;
+		if (d.length + e.text.length + 2 > n) {
+			d || (d = e.text.slice(0, n));
+			break;
+		}
+		d += (d ? "\n\n" : "") + e.text;
+	}
+	return d;
+}
+function k() {
+	let e = b(), t = C(), n = [e, t].filter(Boolean).join("\n\n").slice(0, c), r = E(), i = [];
+	return e && i.push("fixed"), t && i.push("semantic"), {
+		fixedContext: e,
+		flatContext: n,
+		chunks: r,
+		sources: i
 	};
 }
 //#endregion
 //#region src/widget.ts
-var C = "0.2.7", w = "02f96b8";
-console.info(`%cIdjet v${C}${` · ${w}`} — in-browser LLM`, "color:#00e5ff;font-weight:bold");
-function T(e) {
+var A = "0.2.8", j = "456686a";
+console.info(`%cIdjet v${A}${` · ${j}`} — in-browser LLM`, "color:#00e5ff;font-weight:bold");
+function M(e) {
 	return e.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
 }
-function E(e) {
+function N(e) {
 	let t = e.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 	return t = t.replace(/```[\w]*\n?([\s\S]*?)```/g, "<pre><code>$1</code></pre>"), t = t.replace(/`([^`\n]+)`/g, "<code>$1</code>"), t = t.replace(/\*\*\*([^*\n]+)\*\*\*/g, "<strong><em>$1</em></strong>"), t = t.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>"), t = t.replace(/\*([^*\n]+)\*/g, "<em>$1</em>"), t = t.replace(/^#{1,6} (.+)$/gm, "<strong>$1</strong>"), t = t.replace(/^[*\-+] (.+)$/gm, "• $1"), t = t.replace(/^\d+\. (.+)$/gm, (e, t) => `• ${t}`), t = t.replace(/\n/g, "<br>"), t;
 }
-var D = /renoir|vega\s*\d|radeon\s*graphics|uhd\s*graphics|iris|xe\s*graphics|mali|adreno|integrated/i, O = /apple\s*m\d|apple\s*gpu/i, k = /rtx\s*[234]\d{3}|rx\s*[67][89]\d{2}|rx\s*7\d{3}|a[456789]\d{3}|m[12]\s*(ultra|max|pro)/i;
-async function A() {
+var P = /renoir|vega\s*\d|radeon\s*graphics|uhd\s*graphics|iris|xe\s*graphics|mali|adreno|integrated/i, F = /apple\s*m\d|apple\s*gpu/i, I = /rtx\s*[234]\d{3}|rx\s*[67][89]\d{2}|rx\s*7\d{3}|a[456789]\d{3}|m[12]\s*(ultra|max|pro)/i;
+async function L() {
 	let e = navigator, t = (e, t) => ({
 		ok: !0,
 		device: "wasm",
@@ -432,7 +491,7 @@ async function A() {
 		let e = await n.requestAdapterInfo?.();
 		r = e?.description || e?.device || r;
 	} catch {}
-	let i = Math.round((n.limits.maxBufferSize ?? 0) / (1024 * 1024)), a = e.deviceMemory ?? 4, o = D.test(r), s = O.test(r), c = k.test(r) || s, l = o ? Math.min(i || 1024, Math.round(a * 256)) : i || (c ? 6144 : 2048);
+	let i = Math.round((n.limits.maxBufferSize ?? 0) / (1024 * 1024)), a = e.deviceMemory ?? 4, o = P.test(r), s = F.test(r), c = I.test(r) || s, l = o ? Math.min(i || 1024, Math.round(a * 256)) : i || (c ? 6144 : 2048);
 	return /iP(hone|ad|od)/.test(navigator.userAgent) ? t("iOS CPU Mode", "iOS WebGPU has a 256 MB per-buffer cap — using CPU inference instead.") : o || l < 1500 ? {
 		ok: !0,
 		device: "webgpu",
@@ -463,7 +522,7 @@ async function A() {
 		tierColor: "#00e5ff"
 	};
 }
-function j(e) {
+function R(e) {
 	let t = !e.includes("top"), n = !e.includes("right"), r = t ? "bottom" : "top", i = n ? "left" : "right";
 	return `
   :host { all: initial; font-family: ui-monospace, 'Cascadia Code', monospace; }
@@ -602,7 +661,7 @@ function j(e) {
   .btn-stop:hover { background:#ef444422; }
   `;
 }
-var M = class extends HTMLElement {
+var z = class extends HTMLElement {
 	get aiName() {
 		return this.getAttribute("name") ?? "AI Assistant";
 	}
@@ -631,7 +690,7 @@ var M = class extends HTMLElement {
 		return `idjet:${location.hostname}:messages`;
 	}
 	constructor() {
-		super(), this.engine = new a(), this.status = "idle", this.errorMsg = "", this.messages = [], this.generating = !1, this.loading = !1, this.panelVisible = !1, this.rendered = !1, this.hangTimer = null, this.gpuProbe = null, this.context = "", this.lastIndexedUrl = "", this.onUrlChange = () => {
+		super(), this.engine = new a(), this.status = "idle", this.errorMsg = "", this.messages = [], this.generating = !1, this.loading = !1, this.panelVisible = !1, this.rendered = !1, this.hangTimer = null, this.gpuProbe = null, this.fixedContext = "", this.flatContext = "", this.chunks = [], this.lastIndexedUrl = "", this.onUrlChange = () => {
 			location.href !== this.lastIndexedUrl && this.reindex();
 		}, this.shadow = this.attachShadow({ mode: "open" });
 	}
@@ -654,7 +713,8 @@ var M = class extends HTMLElement {
 		e && new MutationObserver(this.onUrlChange).observe(e, { childList: !0 });
 	}
 	reindex() {
-		this.context = x(), this.lastIndexedUrl = location.href;
+		let e = k();
+		this.fixedContext = e.fixedContext, this.flatContext = e.flatContext, this.chunks = e.chunks, this.lastIndexedUrl = location.href;
 	}
 	saveHistory() {
 		try {
@@ -670,7 +730,7 @@ var M = class extends HTMLElement {
 		}
 	}
 	render() {
-		this.shadow.innerHTML = `<style>${j(this.position)}</style>
+		this.shadow.innerHTML = `<style>${R(this.position)}</style>
       <button class="btn-trigger" id="trigger" aria-label="Open AI chat">◈</button>`, this.shadow.getElementById("trigger").addEventListener("click", () => this.togglePanel());
 	}
 	headerHTML() {
@@ -678,8 +738,8 @@ var M = class extends HTMLElement {
 		return `
       <div class="header">
         <span class="dot ${this.status === "ready" ? "live" : ""}"></span>
-        <span class="title">${T(this.aiName.toUpperCase())}</span>
-        <span class="subtitle">${T(this.statusLabel())}</span>
+        <span class="title">${M(this.aiName.toUpperCase())}</span>
+        <span class="subtitle">${M(this.statusLabel())}</span>
         ${e}
       </div>`;
 	}
@@ -702,22 +762,22 @@ var M = class extends HTMLElement {
             <span class="emoji">&#127760;</span>
             <p class="desc">Server-side inference &mdash; instant responses, no download</p>
             <button class="btn-load" id="load">Connect &rarr;</button>
-            <p class="hint">Model: <strong style="color:#e2e8f0">${T(this.apiModel)}</strong></p>
-            <p class="hint" style="margin-top:8px;color:#1e3a4a;font-size:10px;letter-spacing:0.08em">IDJET v${C}${` &middot; ${w}`}</p>
+            <p class="hint">Model: <strong style="color:#e2e8f0">${M(this.apiModel)}</strong></p>
+            <p class="hint" style="margin-top:8px;color:#1e3a4a;font-size:10px;letter-spacing:0.08em">IDJET v${A}${` &middot; ${j}`}</p>
           </div>`;
 				let e = this.gpuProbe;
 				return `<div class="center">
           <span class="emoji">&#129504;</span>
-          <p class="desc" style="margin-bottom:4px">${e ? `<span style="color:${T(e.tierColor)};font-weight:700">${T(e.tierLabel)}</span> &nbsp;·&nbsp; <span style="color:#64748b">${T(e.gpuName)}</span>` : "<span style=\"color:#475569\">Detecting…</span>"}</p>
-          <p class="desc" style="color:#475569;font-size:11px;margin-bottom:8px">${e ? `Model: <strong style="color:#e2e8f0">${T(e.recommendedModel)}</strong> · ${{
+          <p class="desc" style="margin-bottom:4px">${e ? `<span style="color:${M(e.tierColor)};font-weight:700">${M(e.tierLabel)}</span> &nbsp;·&nbsp; <span style="color:#64748b">${M(e.gpuName)}</span>` : "<span style=\"color:#475569\">Detecting…</span>"}</p>
+          <p class="desc" style="color:#475569;font-size:11px;margin-bottom:8px">${e ? `Model: <strong style="color:#e2e8f0">${M(e.recommendedModel)}</strong> · ${{
 					"cpu-sm": "~200 MB · CPU · works everywhere",
 					"qwen-0.5b": "~400 MB · WebGPU",
 					"qwen-1.5b": "~900 MB · WebGPU · best quality"
 				}[e.recommendedModel] ?? "auto"}` : "Model: auto"}</p>
-          ${e?.warning ? `<p class="hint" style="color:#f59e0b;margin-top:-4px">${T(e.warning)}</p>` : ""}
+          ${e?.warning ? `<p class="hint" style="color:#f59e0b;margin-top:-4px">${M(e.warning)}</p>` : ""}
           <button class="btn-load" id="load">Load AI &rarr;</button>
           <p class="hint">Runs in your browser &middot; no server &middot; cached after first load</p>
-          <p class="hint" style="margin-top:8px;color:#1e3a4a;font-size:10px;letter-spacing:0.08em">IDJET v${C}${` &middot; ${w}`}</p>
+          <p class="hint" style="margin-top:8px;color:#1e3a4a;font-size:10px;letter-spacing:0.08em">IDJET v${A}${` &middot; ${j}`}</p>
         </div>`;
 			}
 			case "loading": return "\n        <div class=\"center\">\n          <p id=\"phase-title\" style=\"font-size:13px;font-weight:700;color:#00e5ff\">Downloading model weights</p>\n          <div style=\"width:100%\">\n            <div class=\"progress-bar-track\"><div class=\"progress-bar-fill\" id=\"bar\"></div></div>\n            <div class=\"progress-label\">\n              <span class=\"progress-text\" id=\"prog-text\"></span>\n              <span class=\"progress-pct\" id=\"prog-pct\">0%</span>\n            </div>\n          </div>\n          <p id=\"phase-hint\" class=\"hint\">Cached to your browser after this</p>\n          <button class=\"btn-cancel\" id=\"cancel-load\">Cancel</button>\n        </div>";
@@ -725,16 +785,16 @@ var M = class extends HTMLElement {
         <div class="center">
           <span class="emoji">&#10005;</span>
           <p class="desc" style="color:#f87171;margin-bottom:4px">Failed to load model.</p>
-          <p class="hint" style="color:#64748b;font-size:11px;line-height:1.5;margin-bottom:8px">${T(this.errorMsg)}</p>
+          <p class="hint" style="color:#64748b;font-size:11px;line-height:1.5;margin-bottom:8px">${M(this.errorMsg)}</p>
           <button class="btn-load" id="retry">Try again</button>
         </div>`;
 			case "ready": return "";
 		}
 	}
 	statusLabel() {
-		if (this.status === "ready" && this.apiUrl) return `${T(this.apiModel)} · Server`;
+		if (this.status === "ready" && this.apiUrl) return `${M(this.apiModel)} · Server`;
 		let e = this.gpuProbe;
-		return this.status === "ready" ? `${T(e?.recommendedModel ?? this.modelKey)} · ${e?.device === "wasm" ? "CPU" : "WebGPU"}` : this.status === "loading" ? "loading..." : "offline";
+		return this.status === "ready" ? `${M(e?.recommendedModel ?? this.modelKey)} · ${e?.device === "wasm" ? "CPU" : "WebGPU"}` : this.status === "loading" ? "loading..." : "offline";
 	}
 	appendMessageToDOM(e, t) {
 		let n = this.shadow.getElementById("body");
@@ -742,7 +802,7 @@ var M = class extends HTMLElement {
 		let r = document.createElement("div");
 		r.className = `msg ${e.role}`, r.dataset.idx = String(t);
 		let i = document.createElement("div");
-		i.className = `bubble ${e.role}`, i.id = `msg-${t}`, i.setAttribute("role", e.role === "assistant" ? "status" : "none"), e.content ? e.role === "assistant" ? i.innerHTML = E(e.content) : i.textContent = e.content : i.innerHTML = "<div class=\"typing\"><span></span><span></span><span></span></div>", r.appendChild(i), e.role === "assistant" && e.content && r.appendChild(this.makeCopyBtn(t)), n.appendChild(r), n.scrollTop = n.scrollHeight;
+		i.className = `bubble ${e.role}`, i.id = `msg-${t}`, i.setAttribute("role", e.role === "assistant" ? "status" : "none"), e.content ? e.role === "assistant" ? i.innerHTML = N(e.content) : i.textContent = e.content : i.innerHTML = "<div class=\"typing\"><span></span><span></span><span></span></div>", r.appendChild(i), e.role === "assistant" && e.content && r.appendChild(this.makeCopyBtn(t)), n.appendChild(r), n.scrollTop = n.scrollHeight;
 	}
 	makeCopyBtn(e) {
 		let t = document.createElement("div");
@@ -774,7 +834,7 @@ var M = class extends HTMLElement {
 		if (t?.role !== "assistant") return;
 		let n = this.shadow.getElementById(`msg-${e}`);
 		if (n) {
-			n.innerHTML = E(t.content);
+			n.innerHTML = N(t.content);
 			let r = n.parentElement;
 			r && !r.querySelector(".msg-actions") && r.appendChild(this.makeCopyBtn(e));
 		}
@@ -809,7 +869,7 @@ var M = class extends HTMLElement {
 		if (this.panelVisible) {
 			if (this.emit("open"), !t) {
 				let e = document.createElement("div");
-				e.innerHTML = this.renderPanel(), this.shadow.appendChild(e.firstElementChild), this.status === "ready" && this.messages.forEach((e, t) => this.appendMessageToDOM(e, t)), this.bindPanelEvents(), setTimeout(() => this.shadow.getElementById("input")?.focus(), 50), !this.gpuProbe && this.status === "idle" && A().then((e) => {
+				e.innerHTML = this.renderPanel(), this.shadow.appendChild(e.firstElementChild), this.status === "ready" && this.messages.forEach((e, t) => this.appendMessageToDOM(e, t)), this.bindPanelEvents(), setTimeout(() => this.shadow.getElementById("input")?.focus(), 50), !this.gpuProbe && this.status === "idle" && L().then((e) => {
 					this.gpuProbe = e, this.status === "idle" && this.repaintBody();
 				});
 			}
@@ -848,7 +908,7 @@ var M = class extends HTMLElement {
 					});
 					return;
 				}
-				let e = this.gpuProbe ?? await A();
+				let e = this.gpuProbe ?? await L();
 				this.gpuProbe = e;
 				let t = this.getAttribute("model"), n = e.tier === "high" && t ? t : e.recommendedModel;
 				this.status = "loading", this.repaintBody();
@@ -863,7 +923,7 @@ var M = class extends HTMLElement {
 					model: n
 				});
 			} catch (e) {
-				console.error("[idjet]", e), this.errorMsg = T(e instanceof Error ? e.message.slice(0, 160) : String(e).slice(0, 160)), this.status = "error", this.repaintBody();
+				console.error("[idjet]", e), this.errorMsg = M(e instanceof Error ? e.message.slice(0, 160) : String(e).slice(0, 160)), this.status = "error", this.repaintBody();
 			} finally {
 				this.loading = !1, this.hangTimer && (clearTimeout(this.hangTimer), this.hangTimer = null);
 			}
@@ -907,7 +967,7 @@ var M = class extends HTMLElement {
 	async send() {
 		let e = this.shadow.getElementById("input"), t = e?.value.trim();
 		if (!t || this.generating) return;
-		let n = this.context || x();
+		let n = this.apiUrl ? this.flatContext || k().flatContext : O(t, this.chunks.length > 0 ? this.chunks : k().chunks, 3e3) || this.fixedContext;
 		e && (e.value = ""), this.generating = !0, this.emit("message", {
 			role: "user",
 			content: t
@@ -954,12 +1014,12 @@ var M = class extends HTMLElement {
 };
 //#endregion
 //#region src/index.ts
-customElements.get("llm-chat") || customElements.define("llm-chat", M);
-function N() {
+customElements.get("llm-chat") || customElements.define("llm-chat", z);
+function B() {
 	let e = document.currentScript ?? document.querySelector("script[src*=\"llm-widget\"]");
 	if (e?.dataset.auto === "false" || document.querySelector("llm-chat")) return;
 	let t = document.createElement("llm-chat");
 	e?.dataset.name && t.setAttribute("name", e.dataset.name), e?.dataset.model && t.setAttribute("model", e.dataset.model), e?.dataset.greeting && t.setAttribute("greeting", e.dataset.greeting), document.body.appendChild(t);
 }
-document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", N) : N();
+document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", B) : B();
 //#endregion

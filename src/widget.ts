@@ -1,6 +1,7 @@
 import { InferenceEngine } from './engine';
 import type { RemoteConfig } from './engine';
-import { collectContext } from './indexer';
+import { indexPage, selectChunks } from './indexer';
+import type { Chunk } from './indexer';
 
 declare const __IDJET_VERSION__: string;
 declare const __IDJET_HASH__: string;
@@ -268,7 +269,9 @@ export class LLMChatWidget extends HTMLElement {
   private rendered = false;
   private hangTimer: ReturnType<typeof setTimeout> | null = null;
   private gpuProbe: GPUProbe | null = null;
-  private context = '';
+  private fixedContext = '';
+  private flatContext  = '';
+  private chunks: Chunk[] = [];
   private lastIndexedUrl = '';
 
   get aiName()            { return this.getAttribute('name')          ?? 'AI Assistant'; }
@@ -318,7 +321,10 @@ export class LLMChatWidget extends HTMLElement {
   }
 
   private reindex() {
-    this.context = collectContext();
+    const result = indexPage();
+    this.fixedContext = result.fixedContext;
+    this.flatContext  = result.flatContext;
+    this.chunks       = result.chunks;
     this.lastIndexedUrl = location.href;
   }
 
@@ -725,7 +731,15 @@ export class LLMChatWidget extends HTMLElement {
     const text = input?.value.trim();
     if (!text || this.generating) return;
 
-    const ctx = this.context || collectContext();
+    // Remote/capable models: full flat context (big context window, handles more).
+    // Local 1.5B models: BM25 chunk selection — focused context beats noisy long context
+    // for small models due to the "lost in the middle" degradation.
+    const isRemote = !!this.apiUrl;
+    const ctx = isRemote
+      ? (this.flatContext  || indexPage().flatContext)
+      : selectChunks(text, this.chunks.length > 0 ? this.chunks : indexPage().chunks, 3000)
+        || this.fixedContext;
+
     if (input) input.value = '';
     this.generating = true;
     this.emit('message', { role: 'user', content: text });
