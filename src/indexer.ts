@@ -349,11 +349,18 @@ export function selectChunks(query: string, chunks: Chunk[], budget: number): st
 
   scored.sort((a, b) => b.score - a.score);
 
+  const hasMatches = scored[0]?.score > 0;
+
+  // No BM25 overlap (vocabulary mismatch — e.g. "working on" vs "builds") →
+  // fall back to document order so the model still sees the full page.
+  const candidates = hasMatches
+    ? scored.filter(s => s.score > 0).map(s => s.chunk)
+    : chunks; // original document order
+
   let out = '';
-  for (const { chunk, score } of scored) {
-    if (score === 0) break;
+  for (const chunk of candidates) {
     if (out.length + chunk.text.length + 2 > budget) {
-      if (!out) out = chunk.text.slice(0, budget); // always return something
+      if (!out) out = chunk.text.slice(0, budget);
       break;
     }
     out += (out ? '\n\n' : '') + chunk.text;

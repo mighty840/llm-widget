@@ -439,16 +439,15 @@ function O(e, t, n) {
 		};
 	});
 	u.sort((e, t) => t.score - e.score);
-	let d = "";
-	for (let { chunk: e, score: t } of u) {
-		if (t === 0) break;
-		if (d.length + e.text.length + 2 > n) {
-			d || (d = e.text.slice(0, n));
+	let d = u[0]?.score > 0 ? u.filter((e) => e.score > 0).map((e) => e.chunk) : t, f = "";
+	for (let e of d) {
+		if (f.length + e.text.length + 2 > n) {
+			f || (f = e.text.slice(0, n));
 			break;
 		}
-		d += (d ? "\n\n" : "") + e.text;
+		f += (f ? "\n\n" : "") + e.text;
 	}
-	return d;
+	return f;
 }
 function k() {
 	let e = b(), t = C(), n = [e, t].filter(Boolean).join("\n\n").slice(0, c), r = E(), i = [];
@@ -461,7 +460,7 @@ function k() {
 }
 //#endregion
 //#region src/widget.ts
-var A = "0.2.8", j = "456686a";
+var A = "0.2.9", j = "0e541f1";
 console.info(`%cIdjet v${A}${` · ${j}`} — in-browser LLM`, "color:#00e5ff;font-weight:bold");
 function M(e) {
 	return e.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
