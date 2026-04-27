@@ -183,35 +183,33 @@ function cleanText(el: HTMLElement): string {
   return buf.join('').replace(/\s+/g, ' ').trim();
 }
 
-// Returns the best content element for chunking: most specific container that
-// exists on the page, falling back to body.
-function findContentRoot(): HTMLElement {
+// Returns all distinct semantic content elements on the page, deduplicated
+// bidirectionally (no element that is an ancestor or descendant of another).
+// Both extractSemanticFlat() and chunkPage() use this so they cover the same content.
+function findContentElements(): HTMLElement[] {
+  const seen = new Set<Element>();
+  const els: HTMLElement[] = [];
   for (const sel of SEMANTIC_SELECTORS) {
-    const el = document.querySelector<HTMLElement>(sel);
-    if (el) return el;
+    document.querySelectorAll<HTMLElement>(sel).forEach(el => {
+      if ([...seen].some(s => s.contains(el) || el.contains(s))) return;
+      seen.add(el);
+      els.push(el);
+    });
   }
-  return document.body;
+  return els.length > 0 ? els : [document.body];
 }
 
 // ─── Flat extraction (for remote/capable models) ─────────────────────────────
 
 function extractSemanticFlat(): string {
-  const seen = new Set<Element>();
+  const els = findContentElements();
   const parts: string[] = [];
   let used = 0;
-
-  for (const sel of SEMANTIC_SELECTORS) {
+  for (const el of els) {
     if (used >= FLAT_BUDGET) break;
-    document.querySelectorAll<HTMLElement>(sel).forEach(el => {
-      if (seen.has(el) || used >= FLAT_BUDGET) return;
-      if ([...seen].some(s => s.contains(el) || el.contains(s))) return;
-      seen.add(el);
-      const text = cleanText(el);
-      if (text.length > 40) { parts.push(text); used += text.length; }
-    });
+    const text = cleanText(el);
+    if (text.length > 40) { parts.push(text); used += text.length; }
   }
-
-  if (parts.length === 0) return cleanText(document.body).slice(0, FLAT_BUDGET);
   return parts.join('\n\n').slice(0, FLAT_BUDGET);
 }
 
@@ -236,12 +234,10 @@ function makeChunk(heading: string, body: string): Chunk | null {
   return { heading, text, tokens: tokenize(text) };
 }
 
-// Split content root into heading-based sections.
-// Falls back to sliding windows when the page has no h1-h3 headings.
-export function chunkPage(): Chunk[] {
-  const root = findContentRoot();
+// Chunk a single element by h1-h3 heading boundaries.
+function chunkElement(root: HTMLElement, defaultHeading: string): Chunk[] {
   const chunks: Chunk[] = [];
-  let currentHeading = document.title.trim();
+  let currentHeading = defaultHeading;
   const bodyParts: string[] = [];
 
   function flush() {
@@ -261,8 +257,7 @@ export function chunkPage(): Chunk[] {
     const el = node as HTMLElement;
     if (el.matches?.(NOISE_SELECTOR)) return;
     if (el.getAttribute('aria-hidden') === 'true') return;
-    const tag = el.tagName.toLowerCase();
-    if (/^h[1-3]$/.test(tag)) {
+    if (/^h[1-3]$/.test(el.tagName.toLowerCase())) {
       flush();
       currentHeading = el.textContent?.replace(/\s+/g, ' ').trim() ?? '';
       return;
@@ -272,13 +267,34 @@ export function chunkPage(): Chunk[] {
 
   walk(root);
   flush();
+  return chunks;
+}
 
-  // No heading structure found — fall back to sliding character windows
-  if (chunks.length <= 1) {
-    return windowChunks(cleanText(root));
+// Split all semantic content elements into heading-based chunks.
+// Falls back to sliding windows when no heading structure is found.
+export function chunkPage(): Chunk[] {
+  const els = findContentElements();
+  const allChunks: Chunk[] = [];
+
+  for (const el of els) {
+    // Use the element's own heading text or its id/aria-label as the section label
+    const sectionLabel = (
+      el.querySelector('h1,h2,h3')?.textContent?.trim() ??
+      el.getAttribute('aria-label') ??
+      el.id ??
+      ''
+    );
+    const elChunks = chunkElement(el, sectionLabel);
+    allChunks.push(...elChunks);
   }
 
-  return chunks;
+  // No heading structure found across any element — window the combined text
+  if (allChunks.length <= els.length) {
+    const fullText = els.map(el => cleanText(el)).join('\n\n');
+    return windowChunks(fullText);
+  }
+
+  return allChunks;
 }
 
 function windowChunks(text: string, size = 600, overlap = 100): Chunk[] {

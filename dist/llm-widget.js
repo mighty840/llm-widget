@@ -341,24 +341,20 @@ function x(e) {
 	return n(e), t.join("").replace(/\s+/g, " ").trim();
 }
 function S() {
-	for (let e of u) {
-		let t = document.querySelector(e);
-		if (t) return t;
-	}
-	return document.body;
+	let e = /* @__PURE__ */ new Set(), t = [];
+	for (let n of u) document.querySelectorAll(n).forEach((n) => {
+		[...e].some((e) => e.contains(n) || n.contains(e)) || (e.add(n), t.push(n));
+	});
+	return t.length > 0 ? t : [document.body];
 }
 function C() {
-	let e = /* @__PURE__ */ new Set(), t = [], n = 0;
-	for (let r of u) {
+	let e = S(), t = [], n = 0;
+	for (let r of e) {
 		if (n >= s) break;
-		document.querySelectorAll(r).forEach((r) => {
-			if (e.has(r) || n >= s || [...e].some((e) => e.contains(r) || r.contains(e))) return;
-			e.add(r);
-			let i = x(r);
-			i.length > 40 && (t.push(i), n += i.length);
-		});
+		let e = x(r);
+		e.length > 40 && (t.push(e), n += e.length);
 	}
-	return t.length === 0 ? x(document.body).slice(0, s) : t.join("\n\n").slice(0, s);
+	return t.join("\n\n").slice(0, s);
 }
 function w(e) {
 	return e.toLowerCase().replace(/[^\w\s]/g, " ").split(/\s+/).filter((e) => e.length > 2 && !p.has(e));
@@ -371,33 +367,41 @@ function T(e, t) {
 		tokens: w(n)
 	};
 }
-function E() {
-	let e = S(), t = [], n = document.title.trim(), r = [];
-	function i() {
-		let e = r.join(" ").replace(/\s+/g, " ").trim();
-		r.length = 0;
-		let i = T(n, e);
-		i && t.push(i);
+function E(e, t) {
+	let n = [], r = t, i = [];
+	function a() {
+		let e = i.join(" ").replace(/\s+/g, " ").trim();
+		i.length = 0;
+		let t = T(r, e);
+		t && n.push(t);
 	}
-	function a(e) {
+	function o(e) {
 		if (e.nodeType === Node.TEXT_NODE) {
 			let t = (e.textContent ?? "").replace(/\s+/g, " ").trim();
-			t && r.push(t);
+			t && i.push(t);
 			return;
 		}
 		if (e.nodeType !== Node.ELEMENT_NODE) return;
 		let t = e;
-		if (t.matches?.(l) || t.getAttribute("aria-hidden") === "true") return;
-		let o = t.tagName.toLowerCase();
-		if (/^h[1-3]$/.test(o)) {
-			i(), n = t.textContent?.replace(/\s+/g, " ").trim() ?? "";
-			return;
+		if (!t.matches?.(l) && t.getAttribute("aria-hidden") !== "true") {
+			if (/^h[1-3]$/.test(t.tagName.toLowerCase())) {
+				a(), r = t.textContent?.replace(/\s+/g, " ").trim() ?? "";
+				return;
+			}
+			for (let e of t.childNodes) o(e);
 		}
-		for (let e of t.childNodes) a(e);
 	}
-	return a(e), i(), t.length <= 1 ? D(x(e)) : t;
+	return o(e), a(), n;
 }
-function D(e, t = 600, n = 100) {
+function D() {
+	let e = S(), t = [];
+	for (let n of e) {
+		let e = E(n, n.querySelector("h1,h2,h3")?.textContent?.trim() ?? n.getAttribute("aria-label") ?? n.id ?? "");
+		t.push(...e);
+	}
+	return t.length <= e.length ? O(e.map((e) => x(e)).join("\n\n")) : t;
+}
+function O(e, t = 600, n = 100) {
 	let r = [], i = 0;
 	for (; i < e.length;) {
 		let a = Math.min(i + t, e.length), o = a;
@@ -410,7 +414,7 @@ function D(e, t = 600, n = 100) {
 	}
 	return r;
 }
-function O(e, t, n) {
+function k(e, t, n) {
 	if (t.length === 0) return "";
 	let r = w(e);
 	if (r.length === 0) {
@@ -449,8 +453,8 @@ function O(e, t, n) {
 	}
 	return f;
 }
-function k() {
-	let e = b(), t = C(), n = [e, t].filter(Boolean).join("\n\n").slice(0, c), r = E(), i = [];
+function A() {
+	let e = b(), t = C(), n = [e, t].filter(Boolean).join("\n\n").slice(0, c), r = D(), i = [];
 	return e && i.push("fixed"), t && i.push("semantic"), {
 		fixedContext: e,
 		flatContext: n,
@@ -460,17 +464,17 @@ function k() {
 }
 //#endregion
 //#region src/widget.ts
-var A = "0.2.9", j = "0e541f1";
-console.info(`%cIdjet v${A}${` · ${j}`} — in-browser LLM`, "color:#00e5ff;font-weight:bold");
-function M(e) {
+var j = "0.2.10", M = "0de8c3d";
+console.info(`%cIdjet v${j}${` · ${M}`} — in-browser LLM`, "color:#00e5ff;font-weight:bold");
+function N(e) {
 	return e.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
 }
-function N(e) {
+function P(e) {
 	let t = e.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 	return t = t.replace(/```[\w]*\n?([\s\S]*?)```/g, "<pre><code>$1</code></pre>"), t = t.replace(/`([^`\n]+)`/g, "<code>$1</code>"), t = t.replace(/\*\*\*([^*\n]+)\*\*\*/g, "<strong><em>$1</em></strong>"), t = t.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>"), t = t.replace(/\*([^*\n]+)\*/g, "<em>$1</em>"), t = t.replace(/^#{1,6} (.+)$/gm, "<strong>$1</strong>"), t = t.replace(/^[*\-+] (.+)$/gm, "• $1"), t = t.replace(/^\d+\. (.+)$/gm, (e, t) => `• ${t}`), t = t.replace(/\n/g, "<br>"), t;
 }
-var P = /renoir|vega\s*\d|radeon\s*graphics|uhd\s*graphics|iris|xe\s*graphics|mali|adreno|integrated/i, F = /apple\s*m\d|apple\s*gpu/i, I = /rtx\s*[234]\d{3}|rx\s*[67][89]\d{2}|rx\s*7\d{3}|a[456789]\d{3}|m[12]\s*(ultra|max|pro)/i;
-async function L() {
+var F = /renoir|vega\s*\d|radeon\s*graphics|uhd\s*graphics|iris|xe\s*graphics|mali|adreno|integrated/i, I = /apple\s*m\d|apple\s*gpu/i, L = /rtx\s*[234]\d{3}|rx\s*[67][89]\d{2}|rx\s*7\d{3}|a[456789]\d{3}|m[12]\s*(ultra|max|pro)/i;
+async function R() {
 	let e = navigator, t = (e, t) => ({
 		ok: !0,
 		device: "wasm",
@@ -490,7 +494,7 @@ async function L() {
 		let e = await n.requestAdapterInfo?.();
 		r = e?.description || e?.device || r;
 	} catch {}
-	let i = Math.round((n.limits.maxBufferSize ?? 0) / (1024 * 1024)), a = e.deviceMemory ?? 4, o = P.test(r), s = F.test(r), c = I.test(r) || s, l = o ? Math.min(i || 1024, Math.round(a * 256)) : i || (c ? 6144 : 2048);
+	let i = Math.round((n.limits.maxBufferSize ?? 0) / (1024 * 1024)), a = e.deviceMemory ?? 4, o = F.test(r), s = I.test(r), c = L.test(r) || s, l = o ? Math.min(i || 1024, Math.round(a * 256)) : i || (c ? 6144 : 2048);
 	return /iP(hone|ad|od)/.test(navigator.userAgent) ? t("iOS CPU Mode", "iOS WebGPU has a 256 MB per-buffer cap — using CPU inference instead.") : o || l < 1500 ? {
 		ok: !0,
 		device: "webgpu",
@@ -521,7 +525,7 @@ async function L() {
 		tierColor: "#00e5ff"
 	};
 }
-function R(e) {
+function z(e) {
 	let t = !e.includes("top"), n = !e.includes("right"), r = t ? "bottom" : "top", i = n ? "left" : "right";
 	return `
   :host { all: initial; font-family: ui-monospace, 'Cascadia Code', monospace; }
@@ -660,7 +664,7 @@ function R(e) {
   .btn-stop:hover { background:#ef444422; }
   `;
 }
-var z = class extends HTMLElement {
+var B = class extends HTMLElement {
 	get aiName() {
 		return this.getAttribute("name") ?? "AI Assistant";
 	}
@@ -712,7 +716,7 @@ var z = class extends HTMLElement {
 		e && new MutationObserver(this.onUrlChange).observe(e, { childList: !0 });
 	}
 	reindex() {
-		let e = k();
+		let e = A();
 		this.fixedContext = e.fixedContext, this.flatContext = e.flatContext, this.chunks = e.chunks, this.lastIndexedUrl = location.href;
 	}
 	saveHistory() {
@@ -729,7 +733,7 @@ var z = class extends HTMLElement {
 		}
 	}
 	render() {
-		this.shadow.innerHTML = `<style>${R(this.position)}</style>
+		this.shadow.innerHTML = `<style>${z(this.position)}</style>
       <button class="btn-trigger" id="trigger" aria-label="Open AI chat">◈</button>`, this.shadow.getElementById("trigger").addEventListener("click", () => this.togglePanel());
 	}
 	headerHTML() {
@@ -737,8 +741,8 @@ var z = class extends HTMLElement {
 		return `
       <div class="header">
         <span class="dot ${this.status === "ready" ? "live" : ""}"></span>
-        <span class="title">${M(this.aiName.toUpperCase())}</span>
-        <span class="subtitle">${M(this.statusLabel())}</span>
+        <span class="title">${N(this.aiName.toUpperCase())}</span>
+        <span class="subtitle">${N(this.statusLabel())}</span>
         ${e}
       </div>`;
 	}
@@ -761,22 +765,22 @@ var z = class extends HTMLElement {
             <span class="emoji">&#127760;</span>
             <p class="desc">Server-side inference &mdash; instant responses, no download</p>
             <button class="btn-load" id="load">Connect &rarr;</button>
-            <p class="hint">Model: <strong style="color:#e2e8f0">${M(this.apiModel)}</strong></p>
-            <p class="hint" style="margin-top:8px;color:#1e3a4a;font-size:10px;letter-spacing:0.08em">IDJET v${A}${` &middot; ${j}`}</p>
+            <p class="hint">Model: <strong style="color:#e2e8f0">${N(this.apiModel)}</strong></p>
+            <p class="hint" style="margin-top:8px;color:#1e3a4a;font-size:10px;letter-spacing:0.08em">IDJET v${j}${` &middot; ${M}`}</p>
           </div>`;
 				let e = this.gpuProbe;
 				return `<div class="center">
           <span class="emoji">&#129504;</span>
-          <p class="desc" style="margin-bottom:4px">${e ? `<span style="color:${M(e.tierColor)};font-weight:700">${M(e.tierLabel)}</span> &nbsp;·&nbsp; <span style="color:#64748b">${M(e.gpuName)}</span>` : "<span style=\"color:#475569\">Detecting…</span>"}</p>
-          <p class="desc" style="color:#475569;font-size:11px;margin-bottom:8px">${e ? `Model: <strong style="color:#e2e8f0">${M(e.recommendedModel)}</strong> · ${{
+          <p class="desc" style="margin-bottom:4px">${e ? `<span style="color:${N(e.tierColor)};font-weight:700">${N(e.tierLabel)}</span> &nbsp;·&nbsp; <span style="color:#64748b">${N(e.gpuName)}</span>` : "<span style=\"color:#475569\">Detecting…</span>"}</p>
+          <p class="desc" style="color:#475569;font-size:11px;margin-bottom:8px">${e ? `Model: <strong style="color:#e2e8f0">${N(e.recommendedModel)}</strong> · ${{
 					"cpu-sm": "~200 MB · CPU · works everywhere",
 					"qwen-0.5b": "~400 MB · WebGPU",
 					"qwen-1.5b": "~900 MB · WebGPU · best quality"
 				}[e.recommendedModel] ?? "auto"}` : "Model: auto"}</p>
-          ${e?.warning ? `<p class="hint" style="color:#f59e0b;margin-top:-4px">${M(e.warning)}</p>` : ""}
+          ${e?.warning ? `<p class="hint" style="color:#f59e0b;margin-top:-4px">${N(e.warning)}</p>` : ""}
           <button class="btn-load" id="load">Load AI &rarr;</button>
           <p class="hint">Runs in your browser &middot; no server &middot; cached after first load</p>
-          <p class="hint" style="margin-top:8px;color:#1e3a4a;font-size:10px;letter-spacing:0.08em">IDJET v${A}${` &middot; ${j}`}</p>
+          <p class="hint" style="margin-top:8px;color:#1e3a4a;font-size:10px;letter-spacing:0.08em">IDJET v${j}${` &middot; ${M}`}</p>
         </div>`;
 			}
 			case "loading": return "\n        <div class=\"center\">\n          <p id=\"phase-title\" style=\"font-size:13px;font-weight:700;color:#00e5ff\">Downloading model weights</p>\n          <div style=\"width:100%\">\n            <div class=\"progress-bar-track\"><div class=\"progress-bar-fill\" id=\"bar\"></div></div>\n            <div class=\"progress-label\">\n              <span class=\"progress-text\" id=\"prog-text\"></span>\n              <span class=\"progress-pct\" id=\"prog-pct\">0%</span>\n            </div>\n          </div>\n          <p id=\"phase-hint\" class=\"hint\">Cached to your browser after this</p>\n          <button class=\"btn-cancel\" id=\"cancel-load\">Cancel</button>\n        </div>";
@@ -784,16 +788,16 @@ var z = class extends HTMLElement {
         <div class="center">
           <span class="emoji">&#10005;</span>
           <p class="desc" style="color:#f87171;margin-bottom:4px">Failed to load model.</p>
-          <p class="hint" style="color:#64748b;font-size:11px;line-height:1.5;margin-bottom:8px">${M(this.errorMsg)}</p>
+          <p class="hint" style="color:#64748b;font-size:11px;line-height:1.5;margin-bottom:8px">${N(this.errorMsg)}</p>
           <button class="btn-load" id="retry">Try again</button>
         </div>`;
 			case "ready": return "";
 		}
 	}
 	statusLabel() {
-		if (this.status === "ready" && this.apiUrl) return `${M(this.apiModel)} · Server`;
+		if (this.status === "ready" && this.apiUrl) return `${N(this.apiModel)} · Server`;
 		let e = this.gpuProbe;
-		return this.status === "ready" ? `${M(e?.recommendedModel ?? this.modelKey)} · ${e?.device === "wasm" ? "CPU" : "WebGPU"}` : this.status === "loading" ? "loading..." : "offline";
+		return this.status === "ready" ? `${N(e?.recommendedModel ?? this.modelKey)} · ${e?.device === "wasm" ? "CPU" : "WebGPU"}` : this.status === "loading" ? "loading..." : "offline";
 	}
 	appendMessageToDOM(e, t) {
 		let n = this.shadow.getElementById("body");
@@ -801,7 +805,7 @@ var z = class extends HTMLElement {
 		let r = document.createElement("div");
 		r.className = `msg ${e.role}`, r.dataset.idx = String(t);
 		let i = document.createElement("div");
-		i.className = `bubble ${e.role}`, i.id = `msg-${t}`, i.setAttribute("role", e.role === "assistant" ? "status" : "none"), e.content ? e.role === "assistant" ? i.innerHTML = N(e.content) : i.textContent = e.content : i.innerHTML = "<div class=\"typing\"><span></span><span></span><span></span></div>", r.appendChild(i), e.role === "assistant" && e.content && r.appendChild(this.makeCopyBtn(t)), n.appendChild(r), n.scrollTop = n.scrollHeight;
+		i.className = `bubble ${e.role}`, i.id = `msg-${t}`, i.setAttribute("role", e.role === "assistant" ? "status" : "none"), e.content ? e.role === "assistant" ? i.innerHTML = P(e.content) : i.textContent = e.content : i.innerHTML = "<div class=\"typing\"><span></span><span></span><span></span></div>", r.appendChild(i), e.role === "assistant" && e.content && r.appendChild(this.makeCopyBtn(t)), n.appendChild(r), n.scrollTop = n.scrollHeight;
 	}
 	makeCopyBtn(e) {
 		let t = document.createElement("div");
@@ -833,7 +837,7 @@ var z = class extends HTMLElement {
 		if (t?.role !== "assistant") return;
 		let n = this.shadow.getElementById(`msg-${e}`);
 		if (n) {
-			n.innerHTML = N(t.content);
+			n.innerHTML = P(t.content);
 			let r = n.parentElement;
 			r && !r.querySelector(".msg-actions") && r.appendChild(this.makeCopyBtn(e));
 		}
@@ -868,7 +872,7 @@ var z = class extends HTMLElement {
 		if (this.panelVisible) {
 			if (this.emit("open"), !t) {
 				let e = document.createElement("div");
-				e.innerHTML = this.renderPanel(), this.shadow.appendChild(e.firstElementChild), this.status === "ready" && this.messages.forEach((e, t) => this.appendMessageToDOM(e, t)), this.bindPanelEvents(), setTimeout(() => this.shadow.getElementById("input")?.focus(), 50), !this.gpuProbe && this.status === "idle" && L().then((e) => {
+				e.innerHTML = this.renderPanel(), this.shadow.appendChild(e.firstElementChild), this.status === "ready" && this.messages.forEach((e, t) => this.appendMessageToDOM(e, t)), this.bindPanelEvents(), setTimeout(() => this.shadow.getElementById("input")?.focus(), 50), !this.gpuProbe && this.status === "idle" && R().then((e) => {
 					this.gpuProbe = e, this.status === "idle" && this.repaintBody();
 				});
 			}
@@ -907,7 +911,7 @@ var z = class extends HTMLElement {
 					});
 					return;
 				}
-				let e = this.gpuProbe ?? await L();
+				let e = this.gpuProbe ?? await R();
 				this.gpuProbe = e;
 				let t = this.getAttribute("model"), n = e.tier === "high" && t ? t : e.recommendedModel;
 				this.status = "loading", this.repaintBody();
@@ -922,7 +926,7 @@ var z = class extends HTMLElement {
 					model: n
 				});
 			} catch (e) {
-				console.error("[idjet]", e), this.errorMsg = M(e instanceof Error ? e.message.slice(0, 160) : String(e).slice(0, 160)), this.status = "error", this.repaintBody();
+				console.error("[idjet]", e), this.errorMsg = N(e instanceof Error ? e.message.slice(0, 160) : String(e).slice(0, 160)), this.status = "error", this.repaintBody();
 			} finally {
 				this.loading = !1, this.hangTimer && (clearTimeout(this.hangTimer), this.hangTimer = null);
 			}
@@ -966,7 +970,7 @@ var z = class extends HTMLElement {
 	async send() {
 		let e = this.shadow.getElementById("input"), t = e?.value.trim();
 		if (!t || this.generating) return;
-		let n = this.apiUrl ? this.flatContext || k().flatContext : O(t, this.chunks.length > 0 ? this.chunks : k().chunks, 3e3) || this.fixedContext;
+		let n = this.apiUrl ? this.flatContext || A().flatContext : k(t, this.chunks.length > 0 ? this.chunks : A().chunks, 3e3) || this.fixedContext;
 		e && (e.value = ""), this.generating = !0, this.emit("message", {
 			role: "user",
 			content: t
@@ -1013,12 +1017,12 @@ var z = class extends HTMLElement {
 };
 //#endregion
 //#region src/index.ts
-customElements.get("llm-chat") || customElements.define("llm-chat", z);
-function B() {
+customElements.get("llm-chat") || customElements.define("llm-chat", B);
+function V() {
 	let e = document.currentScript ?? document.querySelector("script[src*=\"llm-widget\"]");
 	if (e?.dataset.auto === "false" || document.querySelector("llm-chat")) return;
 	let t = document.createElement("llm-chat");
 	e?.dataset.name && t.setAttribute("name", e.dataset.name), e?.dataset.model && t.setAttribute("model", e.dataset.model), e?.dataset.greeting && t.setAttribute("greeting", e.dataset.greeting), document.body.appendChild(t);
 }
-document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", B) : B();
+document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", V) : V();
 //#endregion
